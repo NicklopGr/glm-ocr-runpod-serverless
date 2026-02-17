@@ -35,7 +35,7 @@ Pinned SDK ref:
 - `mistral-common` pinned for tokenizer compatibility with this Transformers build:
   - `MISTRAL_COMMON_VERSION=1.8.6`
 - HuggingFace download stack pinned for vLLM startup stability:
-  - `HUGGINGFACE_HUB_VERSION=0.36.0`
+  - `HUGGINGFACE_HUB_VERSION=1.4.1`
   - `TQDM_VERSION=4.67.1`
 - Compatibility patch in Docker build:
   - patches `vllm/transformers_utils/tokenizer.py` to fall back from
