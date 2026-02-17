@@ -151,25 +151,30 @@ p = Path("/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/tra
 src = p.read_text(encoding="utf-8")
 orig = src
 
-needle = '                self.ignore_unexpected_suffixes.append(".bias")\n'
-inject = (
-    needle
-    + "\n"
-    + '        if getattr(self.config, "model_type", None) == "glm_ocr":\n'
-    + "            self.ignore_unexpected_prefixes.extend([\n"
-    + '                "model.language_model.layers.16",\n'
-    + '                "model.language_model.layers.16.",\n'
-    + "            ])\n"
+inject_block = (
+    '        if getattr(self.config, "model_type", None) == "glm_ocr":\n'
+    "            self.ignore_unexpected_prefixes.extend([\n"
+    '                "model.language_model.layers.16",\n'
+    '                "model.language_model.layers.16.",\n'
+    "            ])\n"
 )
+
+needle_primary = '                self.ignore_unexpected_suffixes.append(".bias")\n'
+needle_fallback = '        self.ignore_unexpected_suffixes: list[str] = []\n'
 
 if '"model.language_model.layers.16."' in src:
     print("[patch] vLLM GLM-OCR unexpected-weight ignore patch already applied")
-elif needle in src:
-    src = src.replace(needle, inject, 1)
+elif needle_primary in src:
+    src = src.replace(needle_primary, needle_primary + "\n" + inject_block, 1)
     p.write_text(src, encoding="utf-8")
-    print("[patch] Applied vLLM GLM-OCR unexpected-weight ignore patch")
+    print("[patch] Applied vLLM GLM-OCR unexpected-weight ignore patch (primary anchor)")
+elif needle_fallback in src:
+    src = src.replace(needle_fallback, needle_fallback + inject_block + "\n", 1)
+    p.write_text(src, encoding="utf-8")
+    print("[patch] Applied vLLM GLM-OCR unexpected-weight ignore patch (fallback anchor)")
 else:
-    print("[patch] vLLM GLM-OCR patch not needed (pattern missing)")
+    print("[patch] ERROR: vLLM GLM-OCR patch anchor not found")
+    raise SystemExit(1)
 PY
 
 # Fail fast on declared dependency incompatibilities in the global runtime
@@ -180,6 +185,7 @@ import importlib.metadata as md
 from pathlib import Path
 
 from packaging.markers import default_environment
+from packaging.requirements import InvalidRequirement
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import Version
@@ -201,7 +207,7 @@ watch = {
     ]
 }
 
-installed: dict[str, Version] = {}
+installed = {}
 for dist in md.distributions():
     name = canonicalize_name(dist.metadata.get("Name", ""))
     if name in watch:
@@ -211,14 +217,26 @@ print("[compat] key runtime versions:")
 for name in sorted(installed):
     print(f"  - {watch[name]}=={installed[name]}")
 
-checks: list[tuple[str, str, str, str, str]] = []
+# Only fail build on critical runtime edges that affect vLLM + GLM-OCR startup.
+critical_edges = {
+    "vllm": {"transformers", "tokenizers"},
+    "transformers": {"huggingface_hub", "tokenizers", "tqdm"},
+}
+critical_mismatches = []
+advisory_mismatches = []
+
 for src in ["vllm", "transformers", "huggingface_hub", "mistral-common"]:
     try:
         reqs = md.requires(src) or []
     except md.PackageNotFoundError:
         continue
     for raw in reqs:
-        req = Requirement(raw)
+        try:
+            req = Requirement(raw)
+        except InvalidRequirement:
+            print(f"[compat] WARNING: could not parse requirement for {src}: {raw!r}")
+            continue
+
         dep = canonicalize_name(req.name)
         if dep not in installed:
             continue
@@ -231,11 +249,20 @@ for src in ["vllm", "transformers", "huggingface_hub", "mistral-common"]:
         spec = str(req.specifier) if str(req.specifier) else "*"
         ok = installed[dep] in req.specifier if req.specifier else True
         if not ok:
-            checks.append((src, watch.get(dep, dep), spec, str(installed[dep]), raw))
+            item = (src, watch.get(dep, dep), spec, str(installed[dep]), raw)
+            if dep in critical_edges.get(src, set()):
+                critical_mismatches.append(item)
+            else:
+                advisory_mismatches.append(item)
 
-if checks:
-    print("[compat] incompatible dependency pins detected:")
-    for src, dep, spec, got, raw in checks:
+if advisory_mismatches:
+    print("[compat] advisory mismatches detected (not build-fatal):")
+    for src, dep, spec, got, raw in advisory_mismatches:
+        print(f"  - {src} requires {dep}{spec}, installed {dep}=={got} (from `{raw}`)")
+
+if critical_mismatches:
+    print("[compat] critical incompatible dependency pins detected:")
+    for src, dep, spec, got, raw in critical_mismatches:
         print(f"  - {src} requires {dep}{spec}, installed {dep}=={got} (from `{raw}`)")
     raise SystemExit(1)
 

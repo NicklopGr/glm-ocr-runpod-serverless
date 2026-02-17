@@ -50,7 +50,9 @@ Pinned SDK ref:
     (prevents `There is no module or parameter named 'model.language_model.layers.16'`)
   - runs a global runtime compatibility audit (using package metadata) across:
     `vllm`, `transformers`, `huggingface_hub`, `mistral-common`, `tokenizers`, `tqdm`
-    and fails the image build on declared requirement mismatches
+    and fails the image build on critical startup edges
+    (`vllm -> transformers/tokenizers`, `transformers -> huggingface_hub/tokenizers/tqdm`)
+    while reporting non-critical mismatches as advisory
   - verifies GLM-OCR compatibility mode at build time:
     if native `vllm/model_executor/models/glm_ocr.py` is missing, the build
     requires the fallback MTP-weight ignore patch in Transformers backend
