@@ -78,7 +78,26 @@ Environment presets:
 - A40: paste from `.env.a40`
 - H100: paste from `.env.h100`
 
-## GitHub Workflow (Auto RunPod Rebuild)
+## GitHub Workflow (Build First On GitHub)
+This repo now includes:
+- `.github/workflows/ghcr-build.yml`
+
+Behavior:
+- on each push to `main`, GitHub Actions builds this Docker image first
+- if build succeeds, it pushes to GHCR:
+  - `ghcr.io/nicklopgr/glm-ocr-runpod-serverless:latest`
+  - `ghcr.io/nicklopgr/glm-ocr-runpod-serverless:main`
+  - `ghcr.io/nicklopgr/glm-ocr-runpod-serverless:sha-<commit>`
+- on pull requests, it validates build without pushing
+
+Recommended RunPod setup with this workflow:
+- set endpoint container image to:
+  - `ghcr.io/nicklopgr/glm-ocr-runpod-serverless:latest`
+- for strict reproducibility, use:
+  - `ghcr.io/nicklopgr/glm-ocr-runpod-serverless:sha-<commit>`
+- set GHCR package visibility to public, or configure registry credentials in RunPod
+
+## GitHub Workflow (Auto RunPod Rebuild From GitHub Source)
 This repo now includes:
 - `.github/workflows/runpod-release.yml`
 
