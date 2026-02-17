@@ -77,7 +77,7 @@ fi
 if python3 -c 'import transformers; print(transformers.__version__)' >/tmp/transformers_version.txt 2>/dev/null; then
   echo "[start.sh] Transformers(global): $(cat /tmp/transformers_version.txt)"
 fi
-if python3 -c 'import mistral_common, importlib.metadata as m; print(m.version("mistral-common"))' >/tmp/mistral_common_version.txt 2>/dev/null; then
+if python3 -c 'import importlib.metadata as m; print(m.version("mistral-common"))' >/tmp/mistral_common_version.txt 2>/dev/null; then
   echo "[start.sh] mistral-common(global): $(cat /tmp/mistral_common_version.txt)"
 fi
 echo "[start.sh] vLLM: dtype=${VLLM_DTYPE}, gpu_mem=${GPU_MEMORY_UTILIZATION}, max_seqs=${MAX_NUM_SEQS}, max_batched_tokens=${MAX_NUM_BATCHED_TOKENS}"

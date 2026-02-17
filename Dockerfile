@@ -54,6 +54,31 @@ else:
     print("[patch] vLLM tokenizer patch not needed (pattern missing)")
 PY
 
+# Transformers v5 may default to fast image processors that are incompatible
+# with GLM-OCR multimodal token estimation in this vLLM build.
+RUN python3 - <<'PY'
+from pathlib import Path
+
+p = Path("/usr/local/lib/python3.12/dist-packages/vllm/transformers_utils/processor.py")
+src = p.read_text(encoding="utf-8")
+orig = src
+
+marker1 = '"""Load an image processor for the given model name via HuggingFace."""\n'
+inject = marker1 + '    kwargs.setdefault("use_fast", False)\n'
+if marker1 in src and 'kwargs.setdefault("use_fast", False)' not in src:
+    src = src.replace(marker1, inject, 1)
+
+marker2 = '"""Load a processor for the given model name via HuggingFace."""\n'
+if marker2 in src and src.count('kwargs.setdefault("use_fast", False)') < 2:
+    src = src.replace(marker2, marker2 + '    kwargs.setdefault("use_fast", False)\n', 1)
+
+if src != orig:
+    p.write_text(src, encoding="utf-8")
+    print("[patch] Applied vLLM processor patch: force use_fast=False")
+else:
+    print("[patch] vLLM processor patch not needed (pattern missing/already patched)")
+PY
+
 RUN python3 -m venv ${VENV_PATH}
 
 COPY requirements.txt /tmp/requirements.txt

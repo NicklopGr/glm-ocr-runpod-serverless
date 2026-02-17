@@ -37,6 +37,8 @@ Pinned SDK ref:
 - Compatibility patch in Docker build:
   - patches `vllm/transformers_utils/tokenizer.py` to fall back from
     `all_special_tokens_extended` to `all_special_tokens` (required with Transformers v5)
+  - patches `vllm/transformers_utils/processor.py` to default `use_fast=False`
+    so GLM-OCR uses compatible slow image processor path in this vLLM stack
 - vLLM base image pinned digest:
   - `VLLM_BASE_IMAGE=vllm/vllm-openai@sha256:2a503ea85ae35f6d556cbb12309c628a0a02af85a3f3c527ad4c0c7788553b92`
 - GLM-OCR model snapshot pin:
