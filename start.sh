@@ -78,16 +78,16 @@ if vllm --version >/tmp/vllm_version.txt 2>/dev/null; then
   echo "[start.sh] vLLM(runtime): $(cat /tmp/vllm_version.txt)"
 fi
 if python3 -c 'import transformers; print(transformers.__version__)' >/tmp/transformers_version.txt 2>/dev/null; then
-  echo "[start.sh] Transformers(venv): $(cat /tmp/transformers_version.txt)"
+  echo "[start.sh] Transformers(global): $(cat /tmp/transformers_version.txt)"
 fi
 if python3 -c 'import importlib.metadata as m; print(m.version("mistral-common"))' >/tmp/mistral_common_version.txt 2>/dev/null; then
-  echo "[start.sh] mistral-common(venv): $(cat /tmp/mistral_common_version.txt)"
+  echo "[start.sh] mistral-common(global): $(cat /tmp/mistral_common_version.txt)"
 fi
 if python3 -c 'import importlib.metadata as m; print(m.version("huggingface_hub"))' >/tmp/hf_hub_version.txt 2>/dev/null; then
-  echo "[start.sh] huggingface_hub(venv): $(cat /tmp/hf_hub_version.txt)"
+  echo "[start.sh] huggingface_hub(global): $(cat /tmp/hf_hub_version.txt)"
 fi
 if python3 -c 'import importlib.metadata as m; print(m.version("tqdm"))' >/tmp/tqdm_version.txt 2>/dev/null; then
-  echo "[start.sh] tqdm(venv): $(cat /tmp/tqdm_version.txt)"
+  echo "[start.sh] tqdm(global): $(cat /tmp/tqdm_version.txt)"
 fi
 echo "[start.sh] vLLM: dtype=${VLLM_DTYPE}, gpu_mem=${GPU_MEMORY_UTILIZATION}, max_seqs=${MAX_NUM_SEQS}, max_batched_tokens=${MAX_NUM_BATCHED_TOKENS}"
 echo "[start.sh] GLMOCR: enable_layout=${GLMOCR_ENABLE_LAYOUT}, output_format=${GLMOCR_OUTPUT_FORMAT}, max_workers=${GLMOCR_MAX_WORKERS}, conn_pool=${GLMOCR_CONNECTION_POOL_SIZE}"

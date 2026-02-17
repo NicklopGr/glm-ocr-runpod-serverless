@@ -15,59 +15,25 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 ARG GLMOCR_REF=529a0c7ee9aecf55095e6fa6d9da08e4bb3bc2a9
-ENV GLMOCR_REF=${GLMOCR_REF}
-ENV VLLM_BASE_IMAGE_REF=${VLLM_BASE_IMAGE}
-ENV VENV_PATH=/opt/venv
-ENV PATH=${VENV_PATH}/bin:${PATH}
+ARG TRANSFORMERS_VERSION=5.2.0
+ARG TOKENIZERS_VERSION=0.22.2
+ARG HUGGINGFACE_HUB_VERSION=1.4.1
+ARG TQDM_VERSION=4.67.1
 
-# Validate that the base runtime has native GLM-OCR support and compatible
-# critical dependency edges before installing app-level packages.
+ENV GLMOCR_REF=${GLMOCR_REF}
+ENV TRANSFORMERS_VERSION=${TRANSFORMERS_VERSION}
+ENV TOKENIZERS_VERSION=${TOKENIZERS_VERSION}
+ENV HUGGINGFACE_HUB_VERSION=${HUGGINGFACE_HUB_VERSION}
+ENV TQDM_VERSION=${TQDM_VERSION}
+ENV VLLM_BASE_IMAGE_REF=${VLLM_BASE_IMAGE}
+
+COPY requirements.txt /tmp/requirements.txt
+
+# Verify the pinned vLLM base actually contains native GLM-OCR support.
 RUN python3 - <<'PY'
-import importlib.metadata as md
 from pathlib import Path
 
 import vllm
-from packaging.markers import default_environment
-from packaging.requirements import Requirement
-from packaging.utils import canonicalize_name
-
-runtime = {
-    canonicalize_name("vllm"): md.version("vllm"),
-    canonicalize_name("transformers"): md.version("transformers"),
-    canonicalize_name("tokenizers"): md.version("tokenizers"),
-    canonicalize_name("huggingface_hub"): md.version("huggingface_hub"),
-    canonicalize_name("tqdm"): md.version("tqdm"),
-}
-print("[compat] global runtime versions:")
-for name, version in sorted(runtime.items()):
-    print(f"  - {name}=={version}")
-
-edges = {
-    "vllm": {"transformers", "tokenizers"},
-    "transformers": {"huggingface_hub", "tokenizers", "tqdm"},
-}
-errors = []
-env = default_environment()
-env["extra"] = ""
-
-for src, deps in edges.items():
-    for raw in (md.requires(src) or []):
-        req = Requirement(raw)
-        dep = canonicalize_name(req.name)
-        if dep not in deps:
-            continue
-        if req.marker and not req.marker.evaluate(env):
-            continue
-        if dep not in runtime:
-            errors.append(f"{src} requires {dep} but {dep} is not installed")
-            continue
-        if req.specifier and not req.specifier.contains(runtime[dep], prereleases=True):
-            errors.append(
-                f"{src} requires {dep}{req.specifier}, installed {dep}=={runtime[dep]}"
-            )
-
-if errors:
-    raise SystemExit("[compat] critical dependency mismatches:\n- " + "\n- ".join(errors))
 
 models_dir = Path(vllm.__file__).resolve().parent / "model_executor" / "models"
 native_glm = models_dir / "glm_ocr.py"
@@ -81,17 +47,46 @@ if not native_glm_mtp.exists():
 if "GlmOcrForConditionalGeneration" not in registry_py.read_text(encoding="utf-8"):
     raise SystemExit("[compat] GLM-OCR registry entry missing in " + str(registry_py))
 
-print("[compat] native GLM-OCR and GLM-OCR MTP support verified")
+print("[compat] native GLM-OCR and GLM-OCR MTP support verified in base image")
 PY
 
-RUN python3 -m venv ${VENV_PATH}
+# IMPORTANT: install runtime deps in the GLOBAL environment.
+# vLLM is launched via /usr/local/bin/vllm (global interpreter), so splitting
+# deps across a venv and global Python causes model-config mismatch at startup.
+RUN python3 -m pip install --upgrade pip && \
+    python3 -m pip install --upgrade \
+      "transformers==${TRANSFORMERS_VERSION}" \
+      "tokenizers==${TOKENIZERS_VERSION}" \
+      "huggingface_hub==${HUGGINGFACE_HUB_VERSION}" \
+      "tqdm==${TQDM_VERSION}" && \
+    python3 -m pip install -r /tmp/requirements.txt && \
+    python3 -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip"
 
-COPY requirements.txt /tmp/requirements.txt
-RUN python -m pip install --upgrade pip && \
-    python -m pip install -r /tmp/requirements.txt && \
-    python -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip" && \
-    python -m pip install -r /tmp/requirements.txt && \
-    python -m pip check
+# Validate the final runtime for GLM-OCR startup and handler imports.
+RUN python3 - <<'PY'
+import importlib.metadata as md
+from pathlib import Path
+
+import vllm
+from packaging.version import Version
+from transformers.models.auto.configuration_auto import CONFIG_MAPPING_NAMES
+
+for pkg in ["vllm", "transformers", "tokenizers", "huggingface_hub", "tqdm", "glmocr"]:
+    print(f"[runtime] {pkg}=={md.version(pkg)}")
+
+if Version(md.version("transformers")) < Version("5.1.0"):
+    raise SystemExit("[compat] transformers must be >=5.1.0 for glm_ocr support")
+
+if "glm_ocr" not in CONFIG_MAPPING_NAMES:
+    raise SystemExit("[compat] installed transformers does not expose model type glm_ocr")
+
+models_dir = Path(vllm.__file__).resolve().parent / "model_executor" / "models"
+registry_py = models_dir / "registry.py"
+if "GlmOcrForConditionalGeneration" not in registry_py.read_text(encoding="utf-8"):
+    raise SystemExit("[compat] GLM-OCR registry entry missing in " + str(registry_py))
+
+print("[compat] shared global runtime validated for GLM-OCR")
+PY
 
 COPY handler.py /app/handler.py
 COPY start.sh /app/start.sh
