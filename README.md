@@ -45,6 +45,9 @@ Pinned SDK ref:
   - patches `vllm/model_executor/model_loader/weight_utils.py` so `DisabledTqdm`
     removes any incoming `disable` kwarg before forcing `disable=True`
     (prevents `tqdm_asyncio.__init__() got multiple values for keyword argument 'disable'`)
+  - validates `transformers` -> `huggingface_hub` compatibility from package metadata
+    during image build (fails fast on incompatible pins)
+  - runs `pip check` in the runtime venv during image build (fails fast on dependency conflicts)
 - vLLM base image pinned digest:
   - `VLLM_BASE_IMAGE=vllm/vllm-openai@sha256:2a503ea85ae35f6d556cbb12309c628a0a02af85a3f3c527ad4c0c7788553b92`
 - GLM-OCR model snapshot pin:

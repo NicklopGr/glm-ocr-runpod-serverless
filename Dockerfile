@@ -40,6 +40,35 @@ RUN python3 -m pip install --upgrade \
       "huggingface_hub==${HUGGINGFACE_HUB_VERSION}" \
       "tqdm==${TQDM_VERSION}"
 
+# Verify declared compatibility directly from installed package metadata.
+RUN python3 - <<'PY'
+import importlib.metadata as md
+from packaging.requirements import Requirement
+from packaging.version import Version
+
+transformers_ver = Version(md.version("transformers"))
+hub_ver = Version(md.version("huggingface_hub"))
+tqdm_ver = Version(md.version("tqdm"))
+
+hub_req = None
+for raw in (md.requires("transformers") or []):
+    req = Requirement(raw)
+    if req.name.replace("-", "_") == "huggingface_hub":
+        hub_req = req
+        break
+
+if hub_req is not None and hub_ver not in hub_req.specifier:
+    raise SystemExit(
+        f"Incompatible pins: transformers=={transformers_ver} requires "
+        f"{hub_req.name}{hub_req.specifier}, but huggingface_hub=={hub_ver}"
+    )
+
+print(
+    f"[compat] transformers={transformers_ver}, "
+    f"huggingface_hub={hub_ver}, tqdm={tqdm_ver}"
+)
+PY
+
 # vLLM 0.11.x expects `all_special_tokens_extended`, removed in Transformers v5.
 # Patch vLLM tokenizer helper with a fallback to `all_special_tokens`.
 RUN python3 - <<'PY'
@@ -119,7 +148,8 @@ RUN python -m pip install --upgrade pip && \
     python -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip" && \
     python -m pip install --upgrade \
       "huggingface_hub==${HUGGINGFACE_HUB_VERSION}" \
-      "tqdm==${TQDM_VERSION}"
+      "tqdm==${TQDM_VERSION}" && \
+    python -m pip check
 
 COPY handler.py /app/handler.py
 COPY start.sh /app/start.sh
