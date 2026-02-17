@@ -15,9 +15,13 @@ WORKDIR /app
 ARG GLMOCR_REF=529a0c7ee9aecf55095e6fa6d9da08e4bb3bc2a9
 ARG TRANSFORMERS_REF=372c27e71f80e64571ac1149d1708e641d7d44da
 ARG MISTRAL_COMMON_VERSION=1.8.6
+ARG HUGGINGFACE_HUB_VERSION=0.36.0
+ARG TQDM_VERSION=4.67.1
 ENV GLMOCR_REF=${GLMOCR_REF}
 ENV TRANSFORMERS_REF=${TRANSFORMERS_REF}
 ENV MISTRAL_COMMON_VERSION=${MISTRAL_COMMON_VERSION}
+ENV HUGGINGFACE_HUB_VERSION=${HUGGINGFACE_HUB_VERSION}
+ENV TQDM_VERSION=${TQDM_VERSION}
 ENV VLLM_BASE_IMAGE_REF=${VLLM_BASE_IMAGE}
 ENV VENV_PATH=/opt/venv
 ENV PATH=${VENV_PATH}/bin:${PATH}
@@ -30,6 +34,11 @@ RUN python3 -m pip install --upgrade \
 # Align tokenizer dependency expected by current Transformers GLM/Mistral stack.
 RUN python3 -m pip install --upgrade \
       "mistral-common==${MISTRAL_COMMON_VERSION}"
+
+# Keep HuggingFace stack pinned to a vLLM 0.11.x-compatible baseline.
+RUN python3 -m pip install --upgrade \
+      "huggingface_hub==${HUGGINGFACE_HUB_VERSION}" \
+      "tqdm==${TQDM_VERSION}"
 
 # vLLM 0.11.x expects `all_special_tokens_extended`, removed in Transformers v5.
 # Patch vLLM tokenizer helper with a fallback to `all_special_tokens`.
@@ -79,12 +88,38 @@ else:
     print("[patch] vLLM processor patch not needed (pattern missing/already patched)")
 PY
 
+# huggingface_hub may pass `disable=` into tqdm class constructors.
+# vLLM's DisabledTqdm wrapper already forces disable=True, which can raise:
+#   TypeError: ... got multiple values for keyword argument 'disable'
+RUN python3 - <<'PY'
+from pathlib import Path
+
+p = Path("/usr/local/lib/python3.12/dist-packages/vllm/model_executor/model_loader/weight_utils.py")
+src = p.read_text(encoding="utf-8")
+orig = src
+
+needle = "super().__init__(*args, **kwargs, disable=True)"
+patch = 'kwargs.pop("disable", None)\n        super().__init__(*args, **kwargs, disable=True)'
+
+if 'kwargs.pop("disable", None)' in src:
+    print("[patch] vLLM DisabledTqdm patch already applied")
+elif needle in src:
+    src = src.replace(needle, patch, 1)
+    p.write_text(src, encoding="utf-8")
+    print("[patch] Applied vLLM DisabledTqdm compatibility patch")
+else:
+    print("[patch] vLLM DisabledTqdm patch not needed (pattern missing)")
+PY
+
 RUN python3 -m venv ${VENV_PATH}
 
 COPY requirements.txt /tmp/requirements.txt
 RUN python -m pip install --upgrade pip && \
     python -m pip install -r /tmp/requirements.txt && \
-    python -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip"
+    python -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip" && \
+    python -m pip install --upgrade \
+      "huggingface_hub==${HUGGINGFACE_HUB_VERSION}" \
+      "tqdm==${TQDM_VERSION}"
 
 COPY handler.py /app/handler.py
 COPY start.sh /app/start.sh

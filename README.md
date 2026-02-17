@@ -34,11 +34,17 @@ Pinned SDK ref:
   - Source repo: https://github.com/huggingface/transformers
 - `mistral-common` pinned for tokenizer compatibility with this Transformers build:
   - `MISTRAL_COMMON_VERSION=1.8.6`
+- HuggingFace download stack pinned for vLLM startup stability:
+  - `HUGGINGFACE_HUB_VERSION=0.36.0`
+  - `TQDM_VERSION=4.67.1`
 - Compatibility patch in Docker build:
   - patches `vllm/transformers_utils/tokenizer.py` to fall back from
     `all_special_tokens_extended` to `all_special_tokens` (required with Transformers v5)
   - patches `vllm/transformers_utils/processor.py` to default `use_fast=False`
     so GLM-OCR uses compatible slow image processor path in this vLLM stack
+  - patches `vllm/model_executor/model_loader/weight_utils.py` so `DisabledTqdm`
+    removes any incoming `disable` kwarg before forcing `disable=True`
+    (prevents `tqdm_asyncio.__init__() got multiple values for keyword argument 'disable'`)
 - vLLM base image pinned digest:
   - `VLLM_BASE_IMAGE=vllm/vllm-openai@sha256:2a503ea85ae35f6d556cbb12309c628a0a02af85a3f3c527ad4c0c7788553b92`
 - GLM-OCR model snapshot pin:
@@ -54,6 +60,8 @@ docker build \
   --build-arg GLMOCR_REF=<commit-sha> \
   --build-arg TRANSFORMERS_REF=<transformers-commit-sha> \
   --build-arg MISTRAL_COMMON_VERSION=<mistral-common-version> \
+  --build-arg HUGGINGFACE_HUB_VERSION=<huggingface_hub-version> \
+  --build-arg TQDM_VERSION=<tqdm-version> \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
@@ -64,6 +72,8 @@ docker build \
   --build-arg GLMOCR_REF=<commit-sha> \
   --build-arg TRANSFORMERS_REF=<transformers-commit-sha> \
   --build-arg MISTRAL_COMMON_VERSION=<mistral-common-version> \
+  --build-arg HUGGINGFACE_HUB_VERSION=<huggingface_hub-version> \
+  --build-arg TQDM_VERSION=<tqdm-version> \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
