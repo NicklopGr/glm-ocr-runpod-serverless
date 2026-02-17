@@ -72,6 +72,9 @@ echo "[start.sh] Model: ${MODEL_NAME} -> ${SERVED_MODEL_NAME}"
 if [ -n "${MODEL_REVISION}" ]; then
   echo "[start.sh] Model revision pinned: ${MODEL_REVISION}"
 fi
+if /usr/local/bin/python3 -c 'import transformers; print(transformers.__version__)' >/tmp/transformers_version.txt 2>/dev/null; then
+  echo "[start.sh] Transformers(global): $(cat /tmp/transformers_version.txt)"
+fi
 echo "[start.sh] vLLM: dtype=${VLLM_DTYPE}, gpu_mem=${GPU_MEMORY_UTILIZATION}, max_seqs=${MAX_NUM_SEQS}, max_batched_tokens=${MAX_NUM_BATCHED_TOKENS}"
 echo "[start.sh] GLMOCR: enable_layout=${GLMOCR_ENABLE_LAYOUT}, output_format=${GLMOCR_OUTPUT_FORMAT}, max_workers=${GLMOCR_MAX_WORKERS}, conn_pool=${GLMOCR_CONNECTION_POOL_SIZE}"
 echo "[start.sh] Handler: worker_concurrency=${WORKER_MAX_CONCURRENCY}, max_pages_per_job=${MAX_PAGES_PER_JOB}"

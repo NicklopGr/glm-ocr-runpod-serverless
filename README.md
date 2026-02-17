@@ -29,6 +29,9 @@ docker push <dockerhub_user>/glm-ocr-runpod:latest
 Pinned SDK ref:
 - `GLMOCR_REF=529a0c7ee9aecf55095e6fa6d9da08e4bb3bc2a9` in `Dockerfile`
 - Source commit: https://github.com/zai-org/GLM-OCR/commit/529a0c7ee9aecf55095e6fa6d9da08e4bb3bc2a9
+- Transformers pinned for `glm_ocr` architecture support in vLLM:
+  - `TRANSFORMERS_REF=372c27e71f80e64571ac1149d1708e641d7d44da`
+  - Source repo: https://github.com/huggingface/transformers
 - vLLM base image pinned digest:
   - `VLLM_BASE_IMAGE=vllm/vllm-openai@sha256:2a503ea85ae35f6d556cbb12309c628a0a02af85a3f3c527ad4c0c7788553b92`
 - GLM-OCR model snapshot pinned in presets:
@@ -40,6 +43,7 @@ To compare builds across versions, override explicitly:
 docker build \
   --build-arg VLLM_BASE_IMAGE=<image-tag-or-digest> \
   --build-arg GLMOCR_REF=<commit-sha> \
+  --build-arg TRANSFORMERS_REF=<transformers-commit-sha> \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
@@ -48,6 +52,7 @@ For strict immutability, prefer a digest:
 docker build \
   --build-arg VLLM_BASE_IMAGE=vllm/vllm-openai@sha256:<digest> \
   --build-arg GLMOCR_REF=<commit-sha> \
+  --build-arg TRANSFORMERS_REF=<transformers-commit-sha> \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
