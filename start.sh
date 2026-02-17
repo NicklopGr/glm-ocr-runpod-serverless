@@ -71,6 +71,8 @@ export GLMOCR_LAYOUT_MODEL_DIR GLMOCR_LAYOUT_THRESHOLD GLMOCR_LAYOUT_BATCH_SIZE 
 echo "[start.sh] Model: ${MODEL_NAME} -> ${SERVED_MODEL_NAME}"
 if [ -n "${MODEL_REVISION}" ]; then
   echo "[start.sh] Model revision pinned: ${MODEL_REVISION}"
+else
+  echo "[start.sh] WARNING: MODEL_REVISION is empty (model snapshot is not pinned)"
 fi
 if /usr/local/bin/python3 -c 'import transformers; print(transformers.__version__)' >/tmp/transformers_version.txt 2>/dev/null; then
   echo "[start.sh] Transformers(global): $(cat /tmp/transformers_version.txt)"
@@ -183,6 +185,11 @@ VLLM_PID=$!
 HEALTH_URL="http://127.0.0.1:${VLLM_PORT}/health"
 echo "[start.sh] Waiting for health: ${HEALTH_URL}"
 for i in $(seq 1 "${VLLM_HEALTH_TIMEOUT}"); do
+  if ! kill -0 "${VLLM_PID}" >/dev/null 2>&1; then
+    wait "${VLLM_PID}" || true
+    echo "[start.sh] ERROR: vLLM process exited before becoming healthy"
+    exit 1
+  fi
   if curl -sf "${HEALTH_URL}" >/dev/null 2>&1; then
     echo "[start.sh] vLLM healthy after ${i}s"
     break
