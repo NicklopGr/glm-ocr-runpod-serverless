@@ -32,6 +32,9 @@ Pinned SDK ref:
 - Transformers pinned for `glm_ocr` architecture support in vLLM:
   - `TRANSFORMERS_REF=372c27e71f80e64571ac1149d1708e641d7d44da`
   - Source repo: https://github.com/huggingface/transformers
+- Compatibility patch in Docker build:
+  - patches `vllm/transformers_utils/tokenizer.py` to fall back from
+    `all_special_tokens_extended` to `all_special_tokens` (required with Transformers v5)
 - vLLM base image pinned digest:
   - `VLLM_BASE_IMAGE=vllm/vllm-openai@sha256:2a503ea85ae35f6d556cbb12309c628a0a02af85a3f3c527ad4c0c7788553b92`
 - GLM-OCR model snapshot pinned in presets:

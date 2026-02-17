@@ -25,6 +25,29 @@ ENV PATH=${VENV_PATH}/bin:${PATH}
 RUN python3 -m pip install --upgrade \
       "https://github.com/huggingface/transformers/archive/${TRANSFORMERS_REF}.zip"
 
+# vLLM 0.11.x expects `all_special_tokens_extended`, removed in Transformers v5.
+# Patch vLLM tokenizer helper with a fallback to `all_special_tokens`.
+RUN python3 - <<'PY'
+from pathlib import Path
+
+p = Path("/usr/local/lib/python3.12/dist-packages/vllm/transformers_utils/tokenizer.py")
+src = p.read_text(encoding="utf-8")
+old = "tokenizer_all_special_tokens_extended = tokenizer.all_special_tokens_extended"
+new = (
+    "tokenizer_all_special_tokens_extended = "
+    "getattr(tokenizer, 'all_special_tokens_extended', None)\n"
+    "    if tokenizer_all_special_tokens_extended is None:\n"
+    "        tokenizer_all_special_tokens_extended = tokenizer.all_special_tokens"
+)
+
+if old in src:
+    src = src.replace(old, new, 1)
+    p.write_text(src, encoding="utf-8")
+    print("[patch] Applied vLLM tokenizer compatibility patch for Transformers v5")
+else:
+    print("[patch] vLLM tokenizer patch not needed (pattern missing)")
+PY
+
 RUN python3 -m venv ${VENV_PATH}
 
 COPY requirements.txt /tmp/requirements.txt
