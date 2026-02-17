@@ -17,11 +17,13 @@ ARG TRANSFORMERS_REF=372c27e71f80e64571ac1149d1708e641d7d44da
 ARG MISTRAL_COMMON_VERSION=1.8.6
 ARG HUGGINGFACE_HUB_VERSION=1.4.1
 ARG TQDM_VERSION=4.67.1
+ARG TOKENIZERS_VERSION=0.22.2
 ENV GLMOCR_REF=${GLMOCR_REF}
 ENV TRANSFORMERS_REF=${TRANSFORMERS_REF}
 ENV MISTRAL_COMMON_VERSION=${MISTRAL_COMMON_VERSION}
 ENV HUGGINGFACE_HUB_VERSION=${HUGGINGFACE_HUB_VERSION}
 ENV TQDM_VERSION=${TQDM_VERSION}
+ENV TOKENIZERS_VERSION=${TOKENIZERS_VERSION}
 ENV VLLM_BASE_IMAGE_REF=${VLLM_BASE_IMAGE}
 ENV VENV_PATH=/opt/venv
 ENV PATH=${VENV_PATH}/bin:${PATH}
@@ -38,7 +40,8 @@ RUN python3 -m pip install --upgrade \
 # Keep HuggingFace stack pinned to a vLLM 0.11.x-compatible baseline.
 RUN python3 -m pip install --upgrade \
       "huggingface_hub==${HUGGINGFACE_HUB_VERSION}" \
-      "tqdm==${TQDM_VERSION}"
+      "tqdm==${TQDM_VERSION}" \
+      "tokenizers==${TOKENIZERS_VERSION}"
 
 # Verify declared compatibility directly from installed package metadata.
 RUN python3 - <<'PY'
@@ -49,6 +52,7 @@ from packaging.version import Version
 transformers_ver = Version(md.version("transformers"))
 hub_ver = Version(md.version("huggingface_hub"))
 tqdm_ver = Version(md.version("tqdm"))
+tokenizers_ver = Version(md.version("tokenizers"))
 
 hub_req = None
 for raw in (md.requires("transformers") or []):
@@ -65,7 +69,7 @@ if hub_req is not None and hub_ver not in hub_req.specifier:
 
 print(
     f"[compat] transformers={transformers_ver}, "
-    f"huggingface_hub={hub_ver}, tqdm={tqdm_ver}"
+    f"huggingface_hub={hub_ver}, tqdm={tqdm_ver}, tokenizers={tokenizers_ver}"
 )
 PY
 
@@ -290,7 +294,8 @@ RUN python -m pip install --upgrade pip && \
     python -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip" && \
     python -m pip install --upgrade \
       "huggingface_hub==${HUGGINGFACE_HUB_VERSION}" \
-      "tqdm==${TQDM_VERSION}" && \
+      "tqdm==${TQDM_VERSION}" \
+      "tokenizers==${TOKENIZERS_VERSION}" && \
     python -m pip check
 
 COPY handler.py /app/handler.py

@@ -37,6 +37,7 @@ Pinned SDK ref:
 - HuggingFace download stack pinned for vLLM startup stability:
   - `HUGGINGFACE_HUB_VERSION=1.4.1`
   - `TQDM_VERSION=4.67.1`
+  - `TOKENIZERS_VERSION=0.22.2`
 - Compatibility patch in Docker build:
   - patches `vllm/transformers_utils/tokenizer.py` to fall back from
     `all_special_tokens_extended` to `all_special_tokens` (required with Transformers v5)
@@ -76,6 +77,7 @@ docker build \
   --build-arg MISTRAL_COMMON_VERSION=<mistral-common-version> \
   --build-arg HUGGINGFACE_HUB_VERSION=<huggingface_hub-version> \
   --build-arg TQDM_VERSION=<tqdm-version> \
+  --build-arg TOKENIZERS_VERSION=<tokenizers-version> \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
@@ -88,6 +90,7 @@ docker build \
   --build-arg MISTRAL_COMMON_VERSION=<mistral-common-version> \
   --build-arg HUGGINGFACE_HUB_VERSION=<huggingface_hub-version> \
   --build-arg TQDM_VERSION=<tqdm-version> \
+  --build-arg TOKENIZERS_VERSION=<tokenizers-version> \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
