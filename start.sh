@@ -15,7 +15,7 @@ set -euo pipefail
 : "${MAX_MODEL_LEN:=16384}"
 : "${MAX_NUM_SEQS:=96}"
 : "${MAX_NUM_BATCHED_TOKENS:=32768}"
-: "${LIMIT_MM_PER_PROMPT:={\"image\":1}}"
+: "${LIMIT_MM_PER_PROMPT:=}"
 : "${SPECULATIVE_CONFIG:=}"
 : "${VLLM_HEALTH_TIMEOUT:=420}"
 
@@ -158,7 +158,12 @@ if [ -n "${MODEL_REVISION}" ]; then
 fi
 
 if [ -n "${LIMIT_MM_PER_PROMPT}" ]; then
-  vllm_args+=(--limit-mm-per-prompt "${LIMIT_MM_PER_PROMPT}")
+  if python3 -c 'import json,sys; json.loads(sys.argv[1]); print("ok")' "${LIMIT_MM_PER_PROMPT}" >/dev/null 2>&1; then
+    vllm_args+=(--limit-mm-per-prompt "${LIMIT_MM_PER_PROMPT}")
+    echo "[start.sh] Using --limit-mm-per-prompt=${LIMIT_MM_PER_PROMPT}"
+  else
+    echo "[start.sh] WARNING: LIMIT_MM_PER_PROMPT is not valid JSON; skipping flag (value=${LIMIT_MM_PER_PROMPT})"
+  fi
 fi
 
 if [ -n "${SPECULATIVE_CONFIG}" ]; then
