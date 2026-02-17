@@ -59,8 +59,10 @@ RUN python3 -m pip install --upgrade pip && \
       "tokenizers==${TOKENIZERS_VERSION}" \
       "huggingface_hub==${HUGGINGFACE_HUB_VERSION}" \
       "tqdm==${TQDM_VERSION}" && \
+    python3 -m pip install --upgrade --ignore-installed "blinker==1.9.0" && \
     python3 -m pip install -r /tmp/requirements.txt && \
-    python3 -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip"
+    python3 -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip" && \
+    python3 -m pip check
 
 # Validate the final runtime for GLM-OCR startup and handler imports.
 RUN python3 - <<'PY'
