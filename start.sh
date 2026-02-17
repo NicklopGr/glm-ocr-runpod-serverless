@@ -74,7 +74,7 @@ if [ -n "${MODEL_REVISION}" ]; then
 else
   echo "[start.sh] WARNING: MODEL_REVISION is empty (model snapshot is not pinned)"
 fi
-if /usr/local/bin/python3 -c 'import transformers; print(transformers.__version__)' >/tmp/transformers_version.txt 2>/dev/null; then
+if python3 -c 'import transformers; print(transformers.__version__)' >/tmp/transformers_version.txt 2>/dev/null; then
   echo "[start.sh] Transformers(global): $(cat /tmp/transformers_version.txt)"
 fi
 echo "[start.sh] vLLM: dtype=${VLLM_DTYPE}, gpu_mem=${GPU_MEMORY_UTILIZATION}, max_seqs=${MAX_NUM_SEQS}, max_batched_tokens=${MAX_NUM_BATCHED_TOKENS}"

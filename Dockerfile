@@ -5,6 +5,7 @@
 # Pin to an immutable image digest for reproducibility.
 ARG VLLM_BASE_IMAGE=vllm/vllm-openai@sha256:2a503ea85ae35f6d556cbb12309c628a0a02af85a3f3c527ad4c0c7788553b92
 FROM ${VLLM_BASE_IMAGE}
+ARG VLLM_BASE_IMAGE
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
@@ -21,7 +22,7 @@ ENV PATH=${VENV_PATH}/bin:${PATH}
 
 # Install a GLM-OCR-capable Transformers build in the same Python environment
 # used by the global `vllm` binary from the base image.
-RUN /usr/local/bin/python3 -m pip install --upgrade \
+RUN python3 -m pip install --upgrade \
       "https://github.com/huggingface/transformers/archive/${TRANSFORMERS_REF}.zip"
 
 RUN python3 -m venv ${VENV_PATH}
