@@ -14,11 +14,15 @@ WORKDIR /app
 ARG GLMOCR_REF=529a0c7ee9aecf55095e6fa6d9da08e4bb3bc2a9
 ENV GLMOCR_REF=${GLMOCR_REF}
 ENV VLLM_BASE_IMAGE_REF=${VLLM_BASE_IMAGE}
+ENV VENV_PATH=/opt/venv
+ENV PATH=${VENV_PATH}/bin:${PATH}
+
+RUN python3 -m venv ${VENV_PATH}
 
 COPY requirements.txt /tmp/requirements.txt
-RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install -r /tmp/requirements.txt && \
-    python3 -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip"
+RUN python -m pip install --upgrade pip && \
+    python -m pip install -r /tmp/requirements.txt && \
+    python -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip"
 
 COPY handler.py /app/handler.py
 COPY start.sh /app/start.sh
