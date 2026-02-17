@@ -55,6 +55,8 @@ Pinned SDK ref:
     and fails the image build on critical startup edges
     (`vllm -> transformers/tokenizers`, `transformers -> huggingface_hub/tokenizers/tqdm`)
     while reporting non-critical mismatches as advisory
+  - audit evaluates prerelease/dev versions as valid for specifier checks
+    (important when `transformers` is installed from a git commit like `5.2.0.dev0`)
   - verifies GLM-OCR compatibility mode at build time:
     if native `vllm/model_executor/models/glm_ocr.py` is missing, the build
     requires the fallback MTP-weight ignore patch in Transformers backend

@@ -64,6 +64,13 @@ for raw in (md.requires("transformers") or []):
         break
 
 if hub_req is not None and hub_ver not in hub_req.specifier:
+    # Git-based package installs may surface prerelease/dev versions.
+    # Evaluate with prereleases enabled to avoid false incompatibility flags.
+    hub_ok = hub_req.specifier.contains(hub_ver, prereleases=True)
+else:
+    hub_ok = True
+
+if not hub_ok:
     raise SystemExit(
         f"Incompatible pins: transformers=={transformers_ver} requires "
         f"{hub_req.name}{hub_req.specifier}, but huggingface_hub=={hub_ver}"
@@ -257,7 +264,12 @@ for src in ["vllm", "transformers", "huggingface_hub", "mistral-common"]:
             continue
 
         spec = str(req.specifier) if str(req.specifier) else "*"
-        ok = installed[dep] in req.specifier if req.specifier else True
+        # Git-based refs often produce prerelease/dev versions (e.g. 5.2.0.dev0).
+        # Treat prereleases as valid candidates for declared specifiers.
+        ok = (
+            req.specifier.contains(installed[dep], prereleases=True)
+            if req.specifier else True
+        )
         if not ok:
             item = (src, watch.get(dep, dep), spec, str(installed[dep]), raw)
             if dep in critical_edges.get(src, set()):
