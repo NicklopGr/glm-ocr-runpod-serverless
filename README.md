@@ -46,12 +46,17 @@ Pinned refs and compatibility:
     - `vllm/model_executor/models/glm_ocr.py`
     - `vllm/model_executor/models/glm_ocr_mtp.py`
     - `GlmOcrForConditionalGeneration` mapping in `registry.py`
+  - enforces critical dependency edges:
+    - `vllm -> tokenizers`
+    - `transformers -> huggingface_hub, tokenizers, tqdm`
+  - enforces `vllm -> transformers` with an explicit allowlist only for:
+    - vLLM nightly metadata still advertising `<5` while runtime is validated
+      for GLM-OCR using Transformers `>=5.1.0`
   - verifies installed Transformers exposes `glm_ocr` model type
   - verifies `transformers >= 5.1.0`
   - verifies `glmocr` package import/version in final runtime
-  - intentionally does not use raw `pip check` as a build gate because current
-    vLLM nightly metadata still declares `transformers<5` while GLM-OCR support
-    requires Transformers 5.x; runtime validation is used instead
+  - intentionally does not use raw `pip check` as a build gate because it fails
+    on the same known allowlisted metadata mismatch and unrelated system deps
 - GLM-OCR model snapshot pin:
   - default in `start.sh` (used when endpoint env is missing)
   - `MODEL_REVISION=e9134f400acad80346162536e043def285fa1022`

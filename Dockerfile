@@ -69,6 +69,10 @@ import importlib.metadata as md
 from pathlib import Path
 
 import vllm
+from packaging.markers import default_environment
+from packaging.requirements import InvalidRequirement
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 from packaging.version import Version
 from transformers.models.auto.configuration_auto import CONFIG_MAPPING_NAMES
 
@@ -80,6 +84,57 @@ if Version(md.version("transformers")) < Version("5.1.0"):
 
 if "glm_ocr" not in CONFIG_MAPPING_NAMES:
     raise SystemExit("[compat] installed transformers does not expose model type glm_ocr")
+
+# Enforce critical dependency edges, with a tight allowlist for known
+# vLLM-nightly metadata lag on transformers major version.
+installed = {
+    canonicalize_name("vllm"): Version(md.version("vllm")),
+    canonicalize_name("transformers"): Version(md.version("transformers")),
+    canonicalize_name("tokenizers"): Version(md.version("tokenizers")),
+    canonicalize_name("huggingface_hub"): Version(md.version("huggingface_hub")),
+    canonicalize_name("tqdm"): Version(md.version("tqdm")),
+}
+critical_edges = {
+    "vllm": {"transformers", "tokenizers"},
+    "transformers": {"huggingface_hub", "tokenizers", "tqdm"},
+}
+env = default_environment()
+env["extra"] = ""
+errors: list[str] = []
+
+for src, deps in critical_edges.items():
+    for raw in (md.requires(src) or []):
+        try:
+            req = Requirement(raw)
+        except InvalidRequirement:
+            continue
+        dep = canonicalize_name(req.name)
+        if dep not in deps:
+            continue
+        if dep not in installed:
+            errors.append(f"{src} requires {dep}, but {dep} is not installed")
+            continue
+        if req.marker and not req.marker.evaluate(env):
+            continue
+        if not req.specifier:
+            continue
+        if req.specifier.contains(installed[dep], prereleases=True):
+            continue
+
+        if src == "vllm" and dep == "transformers":
+            if installed[dep] >= Version("5.1.0") and "glm_ocr" in CONFIG_MAPPING_NAMES:
+                print(
+                    "[compat] allowlisted mismatch: "
+                    f"{src} requires {dep}{req.specifier}, installed {dep}=={installed[dep]} "
+                    "(GLM-OCR requires transformers>=5.1.0)"
+                )
+                continue
+        errors.append(
+            f"{src} requires {dep}{req.specifier}, installed {dep}=={installed[dep]}"
+        )
+
+if errors:
+    raise SystemExit("[compat] critical dependency mismatches:\n- " + "\n- ".join(errors))
 
 models_dir = Path(vllm.__file__).resolve().parent / "model_executor" / "models"
 registry_py = models_dir / "registry.py"
