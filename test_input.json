@@ -1,0 +1,12 @@
+{
+  "input": {
+    "pdf_url": "https://example.com/statement.pdf",
+    "start_page": 1,
+    "end_page": 12,
+    "return_crop_images": true,
+    "crop_images_base64": false,
+    "max_crop_images": 50,
+    "return_layout_visualization": true,
+    "layout_visualization_base64": false
+  }
+}

@@ -1,0 +1,4 @@
+runpod>=1.7.0
+aiohttp>=3.10.0
+pillow>=10.4.0
+pypdf>=5.2.0
