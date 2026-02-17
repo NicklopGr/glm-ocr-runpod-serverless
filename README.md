@@ -26,45 +26,24 @@ docker build -t <dockerhub_user>/glm-ocr-runpod:latest .
 docker push <dockerhub_user>/glm-ocr-runpod:latest
 ```
 
-Pinned SDK ref:
+Pinned refs and compatibility:
 - `GLMOCR_REF=529a0c7ee9aecf55095e6fa6d9da08e4bb3bc2a9` in `Dockerfile`
 - Source commit: https://github.com/zai-org/GLM-OCR/commit/529a0c7ee9aecf55095e6fa6d9da08e4bb3bc2a9
-- Transformers pinned for `glm_ocr` architecture support in vLLM:
-  - `TRANSFORMERS_REF=372c27e71f80e64571ac1149d1708e641d7d44da`
-  - Source repo: https://github.com/huggingface/transformers
-- `mistral-common` pinned for tokenizer compatibility with this Transformers build:
-  - `MISTRAL_COMMON_VERSION=1.8.6`
-- HuggingFace download stack pinned for vLLM startup stability:
-  - `HUGGINGFACE_HUB_VERSION=1.4.1`
-  - `TQDM_VERSION=4.67.1`
-  - `TOKENIZERS_VERSION=0.22.2`
-  - `STRICT_COMPAT_AUDIT=false` (set to `true` to make compatibility audit build-fatal)
-- Compatibility patch in Docker build:
-  - patches `vllm/transformers_utils/tokenizer.py` to fall back from
-    `all_special_tokens_extended` to `all_special_tokens` (required with Transformers v5)
-  - patches `vllm/transformers_utils/processor.py` to default `use_fast=False`
-    so GLM-OCR uses compatible slow image processor path in this vLLM stack
-  - patches `vllm/model_executor/model_loader/weight_utils.py` so `DisabledTqdm`
-    removes any incoming `disable` kwarg before forcing `disable=True`
-    (prevents `tqdm_asyncio.__init__() got multiple values for keyword argument 'disable'`)
-  - patches `vllm/model_executor/models/transformers/base.py` so `glm_ocr`
-    ignores unexpected checkpoint keys under `model.language_model.layers.16.*`
-    (prevents `There is no module or parameter named 'model.language_model.layers.16'`)
-  - runs a global runtime compatibility audit (using package metadata) across:
-    `vllm`, `transformers`, `huggingface_hub`, `mistral-common`, `tokenizers`, `tqdm`
-    and fails the image build on critical startup edges
-    (`vllm -> transformers/tokenizers`, `transformers -> huggingface_hub/tokenizers/tqdm`)
-    while reporting non-critical mismatches as advisory
-  - audit evaluates prerelease/dev versions as valid for specifier checks
-    (important when `transformers` is installed from a git commit like `5.2.0.dev0`)
-  - verifies GLM-OCR compatibility mode at build time:
-    if native `vllm/model_executor/models/glm_ocr.py` is missing, the build
-    requires the fallback MTP-weight ignore patch in Transformers backend
-  - validates `transformers` -> `huggingface_hub` compatibility from package metadata
-    during image build (fails fast on incompatible pins)
-  - runs `pip check` in the runtime venv during image build (fails fast on dependency conflicts)
-- vLLM base image pinned digest:
-  - `VLLM_BASE_IMAGE=vllm/vllm-openai@sha256:2a503ea85ae35f6d556cbb12309c628a0a02af85a3f3c527ad4c0c7788553b92`
+- vLLM base image pinned by commit + digest:
+  - `VLLM_BASE_IMAGE=vllm/vllm-openai:nightly-d00df624f313a6a5a7a6245b71448b068b080cd7@sha256:3f5ad92f63e3f4b0073cca935a976d4cbf2a21e22cf06a95fd6df47759e10e04`
+- Why this base pin:
+  - `v0.15.1` and earlier do not include native `GlmOcrForConditionalGeneration`
+  - native GLM-OCR model implementation appears in vLLM `v0.16.0` source (`glm_ocr.py`, `glm_ocr_mtp.py`)
+  - as of 2026-02-17, `vllm/vllm-openai` does not publish a `v0.16.x` tag, so we pin a known nightly commit digest
+- Build-time compatibility gates:
+  - validates critical dependency edges in the global vLLM runtime from package metadata:
+    - `vllm -> transformers, tokenizers`
+    - `transformers -> huggingface_hub, tokenizers, tqdm`
+  - verifies native GLM-OCR files and registry entry exist in vLLM:
+    - `vllm/model_executor/models/glm_ocr.py`
+    - `vllm/model_executor/models/glm_ocr_mtp.py`
+    - `GlmOcrForConditionalGeneration` mapping in `registry.py`
+  - runs `pip check` in the handler venv during image build
 - GLM-OCR model snapshot pin:
   - default in `start.sh` (used when endpoint env is missing)
   - `MODEL_REVISION=e9134f400acad80346162536e043def285fa1022`
@@ -76,26 +55,14 @@ To compare builds across versions, override explicitly:
 docker build \
   --build-arg VLLM_BASE_IMAGE=<image-tag-or-digest> \
   --build-arg GLMOCR_REF=<commit-sha> \
-  --build-arg TRANSFORMERS_REF=<transformers-commit-sha> \
-  --build-arg MISTRAL_COMMON_VERSION=<mistral-common-version> \
-  --build-arg HUGGINGFACE_HUB_VERSION=<huggingface_hub-version> \
-  --build-arg TQDM_VERSION=<tqdm-version> \
-  --build-arg TOKENIZERS_VERSION=<tokenizers-version> \
-  --build-arg STRICT_COMPAT_AUDIT=<true_or_false> \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
 For strict immutability, prefer a digest:
 ```bash
 docker build \
-  --build-arg VLLM_BASE_IMAGE=vllm/vllm-openai@sha256:<digest> \
+  --build-arg VLLM_BASE_IMAGE=vllm/vllm-openai:<tag>@sha256:<digest> \
   --build-arg GLMOCR_REF=<commit-sha> \
-  --build-arg TRANSFORMERS_REF=<transformers-commit-sha> \
-  --build-arg MISTRAL_COMMON_VERSION=<mistral-common-version> \
-  --build-arg HUGGINGFACE_HUB_VERSION=<huggingface_hub-version> \
-  --build-arg TQDM_VERSION=<tqdm-version> \
-  --build-arg TOKENIZERS_VERSION=<tokenizers-version> \
-  --build-arg STRICT_COMPAT_AUDIT=<true_or_false> \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
