@@ -5,7 +5,7 @@ set -euo pipefail
 # vLLM defaults (A40-optimized baseline). Override via RunPod env vars.
 # -----------------------------------------------------------------------------
 : "${MODEL_NAME:=zai-org/GLM-OCR}"
-: "${MODEL_REVISION:=}"
+: "${MODEL_REVISION:=e9134f400acad80346162536e043def285fa1022}"
 : "${SERVED_MODEL_NAME:=glm-ocr}"
 : "${VLLM_HOST:=0.0.0.0}"
 : "${VLLM_PORT:=8080}"

@@ -37,8 +37,10 @@ Pinned SDK ref:
     `all_special_tokens_extended` to `all_special_tokens` (required with Transformers v5)
 - vLLM base image pinned digest:
   - `VLLM_BASE_IMAGE=vllm/vllm-openai@sha256:2a503ea85ae35f6d556cbb12309c628a0a02af85a3f3c527ad4c0c7788553b92`
-- GLM-OCR model snapshot pinned in presets:
+- GLM-OCR model snapshot pin:
+  - default in `start.sh` (used when endpoint env is missing)
   - `MODEL_REVISION=e9134f400acad80346162536e043def285fa1022`
+  - same value in `.env.a40` and `.env.h100` presets
   - Source commit: https://huggingface.co/zai-org/GLM-OCR/commit/e9134f400acad80346162536e043def285fa1022
 
 To compare builds across versions, override explicitly:
