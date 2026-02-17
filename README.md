@@ -32,6 +32,8 @@ Pinned SDK ref:
 - Transformers pinned for `glm_ocr` architecture support in vLLM:
   - `TRANSFORMERS_REF=372c27e71f80e64571ac1149d1708e641d7d44da`
   - Source repo: https://github.com/huggingface/transformers
+- `mistral-common` pinned for tokenizer compatibility with this Transformers build:
+  - `MISTRAL_COMMON_VERSION=1.8.6`
 - Compatibility patch in Docker build:
   - patches `vllm/transformers_utils/tokenizer.py` to fall back from
     `all_special_tokens_extended` to `all_special_tokens` (required with Transformers v5)
@@ -49,6 +51,7 @@ docker build \
   --build-arg VLLM_BASE_IMAGE=<image-tag-or-digest> \
   --build-arg GLMOCR_REF=<commit-sha> \
   --build-arg TRANSFORMERS_REF=<transformers-commit-sha> \
+  --build-arg MISTRAL_COMMON_VERSION=<mistral-common-version> \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
@@ -58,6 +61,7 @@ docker build \
   --build-arg VLLM_BASE_IMAGE=vllm/vllm-openai@sha256:<digest> \
   --build-arg GLMOCR_REF=<commit-sha> \
   --build-arg TRANSFORMERS_REF=<transformers-commit-sha> \
+  --build-arg MISTRAL_COMMON_VERSION=<mistral-common-version> \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 

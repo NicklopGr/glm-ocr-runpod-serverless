@@ -14,8 +14,10 @@ WORKDIR /app
 
 ARG GLMOCR_REF=529a0c7ee9aecf55095e6fa6d9da08e4bb3bc2a9
 ARG TRANSFORMERS_REF=372c27e71f80e64571ac1149d1708e641d7d44da
+ARG MISTRAL_COMMON_VERSION=1.8.6
 ENV GLMOCR_REF=${GLMOCR_REF}
 ENV TRANSFORMERS_REF=${TRANSFORMERS_REF}
+ENV MISTRAL_COMMON_VERSION=${MISTRAL_COMMON_VERSION}
 ENV VLLM_BASE_IMAGE_REF=${VLLM_BASE_IMAGE}
 ENV VENV_PATH=/opt/venv
 ENV PATH=${VENV_PATH}/bin:${PATH}
@@ -24,6 +26,10 @@ ENV PATH=${VENV_PATH}/bin:${PATH}
 # used by the global `vllm` binary from the base image.
 RUN python3 -m pip install --upgrade \
       "https://github.com/huggingface/transformers/archive/${TRANSFORMERS_REF}.zip"
+
+# Align tokenizer dependency expected by current Transformers GLM/Mistral stack.
+RUN python3 -m pip install --upgrade \
+      "mistral-common==${MISTRAL_COMMON_VERSION}"
 
 # vLLM 0.11.x expects `all_special_tokens_extended`, removed in Transformers v5.
 # Patch vLLM tokenizer helper with a fallback to `all_special_tokens`.
