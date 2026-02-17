@@ -172,6 +172,89 @@ else:
     print("[patch] vLLM GLM-OCR patch not needed (pattern missing)")
 PY
 
+# Fail fast on declared dependency incompatibilities in the global runtime
+# environment used by `vllm`, and ensure GLM-OCR fallback compatibility is in
+# place when native `glm_ocr` model support is absent in this vLLM build.
+RUN python3 - <<'PY'
+import importlib.metadata as md
+from pathlib import Path
+
+from packaging.markers import default_environment
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
+from packaging.version import Version
+
+watch = {
+    canonicalize_name(name): name
+    for name in [
+        "vllm",
+        "transformers",
+        "huggingface_hub",
+        "tokenizers",
+        "tqdm",
+        "mistral-common",
+        "torch",
+        "numpy",
+        "requests",
+        "pillow",
+        "safetensors",
+    ]
+}
+
+installed: dict[str, Version] = {}
+for dist in md.distributions():
+    name = canonicalize_name(dist.metadata.get("Name", ""))
+    if name in watch:
+        installed[name] = Version(dist.version)
+
+print("[compat] key runtime versions:")
+for name in sorted(installed):
+    print(f"  - {watch[name]}=={installed[name]}")
+
+checks: list[tuple[str, str, str, str, str]] = []
+for src in ["vllm", "transformers", "huggingface_hub", "mistral-common"]:
+    try:
+        reqs = md.requires(src) or []
+    except md.PackageNotFoundError:
+        continue
+    for raw in reqs:
+        req = Requirement(raw)
+        dep = canonicalize_name(req.name)
+        if dep not in installed:
+            continue
+
+        env = default_environment()
+        env["extra"] = ""
+        if req.marker and not req.marker.evaluate(env):
+            continue
+
+        spec = str(req.specifier) if str(req.specifier) else "*"
+        ok = installed[dep] in req.specifier if req.specifier else True
+        if not ok:
+            checks.append((src, watch.get(dep, dep), spec, str(installed[dep]), raw))
+
+if checks:
+    print("[compat] incompatible dependency pins detected:")
+    for src, dep, spec, got, raw in checks:
+        print(f"  - {src} requires {dep}{spec}, installed {dep}=={got} (from `{raw}`)")
+    raise SystemExit(1)
+
+models_dir = Path("/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models")
+native_glm_ocr = (models_dir / "glm_ocr.py").exists()
+if native_glm_ocr:
+    print("[compat] native vLLM glm_ocr model support detected")
+else:
+    base_py = models_dir / "transformers" / "base.py"
+    src = base_py.read_text(encoding="utf-8")
+    marker = "model.language_model.layers.16"
+    if marker not in src:
+        raise SystemExit(
+            "[compat] vLLM has no native glm_ocr support and fallback ignore "
+            "patch is missing; GLM-OCR startup will fail on MTP-only weights"
+        )
+    print("[compat] no native glm_ocr model; fallback MTP-weight ignore patch verified")
+PY
+
 RUN python3 -m venv ${VENV_PATH}
 
 COPY requirements.txt /tmp/requirements.txt
