@@ -61,8 +61,7 @@ RUN python3 -m pip install --upgrade pip && \
       "tqdm==${TQDM_VERSION}" && \
     python3 -m pip install --upgrade --ignore-installed "blinker==1.9.0" && \
     python3 -m pip install -r /tmp/requirements.txt && \
-    python3 -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip" && \
-    python3 -m pip check
+    python3 -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip"
 
 # Validate the final runtime for GLM-OCR startup and handler imports.
 RUN python3 - <<'PY'

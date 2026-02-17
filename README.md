@@ -49,6 +49,9 @@ Pinned refs and compatibility:
   - verifies installed Transformers exposes `glm_ocr` model type
   - verifies `transformers >= 5.1.0`
   - verifies `glmocr` package import/version in final runtime
+  - intentionally does not use raw `pip check` as a build gate because current
+    vLLM nightly metadata still declares `transformers<5` while GLM-OCR support
+    requires Transformers 5.x; runtime validation is used instead
 - GLM-OCR model snapshot pin:
   - default in `start.sh` (used when endpoint env is missing)
   - `MODEL_REVISION=e9134f400acad80346162536e043def285fa1022`
