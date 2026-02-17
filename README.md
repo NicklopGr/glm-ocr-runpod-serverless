@@ -38,6 +38,7 @@ Pinned SDK ref:
   - `HUGGINGFACE_HUB_VERSION=1.4.1`
   - `TQDM_VERSION=4.67.1`
   - `TOKENIZERS_VERSION=0.22.2`
+  - `STRICT_COMPAT_AUDIT=false` (set to `true` to make compatibility audit build-fatal)
 - Compatibility patch in Docker build:
   - patches `vllm/transformers_utils/tokenizer.py` to fall back from
     `all_special_tokens_extended` to `all_special_tokens` (required with Transformers v5)
@@ -78,6 +79,7 @@ docker build \
   --build-arg HUGGINGFACE_HUB_VERSION=<huggingface_hub-version> \
   --build-arg TQDM_VERSION=<tqdm-version> \
   --build-arg TOKENIZERS_VERSION=<tokenizers-version> \
+  --build-arg STRICT_COMPAT_AUDIT=<true_or_false> \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
@@ -91,6 +93,7 @@ docker build \
   --build-arg HUGGINGFACE_HUB_VERSION=<huggingface_hub-version> \
   --build-arg TQDM_VERSION=<tqdm-version> \
   --build-arg TOKENIZERS_VERSION=<tokenizers-version> \
+  --build-arg STRICT_COMPAT_AUDIT=<true_or_false> \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
