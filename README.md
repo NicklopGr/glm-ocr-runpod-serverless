@@ -45,6 +45,9 @@ Pinned SDK ref:
   - patches `vllm/model_executor/model_loader/weight_utils.py` so `DisabledTqdm`
     removes any incoming `disable` kwarg before forcing `disable=True`
     (prevents `tqdm_asyncio.__init__() got multiple values for keyword argument 'disable'`)
+  - patches `vllm/model_executor/models/transformers/base.py` so `glm_ocr`
+    ignores unexpected checkpoint keys under `model.language_model.layers.16.*`
+    (prevents `There is no module or parameter named 'model.language_model.layers.16'`)
   - validates `transformers` -> `huggingface_hub` compatibility from package metadata
     during image build (fails fast on incompatible pins)
   - runs `pip check` in the runtime venv during image build (fails fast on dependency conflicts)

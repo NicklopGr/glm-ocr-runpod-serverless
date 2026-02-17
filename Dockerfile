@@ -140,6 +140,38 @@ else:
     print("[patch] vLLM DisabledTqdm patch not needed (pattern missing)")
 PY
 
+# GLM-OCR checkpoints include extra MTP-only weights under
+# `model.language_model.layers.16.*`. This vLLM base falls back to the
+# generic Transformers backend, which is strict by default and crashes on
+# those unexpected keys. Ignore that prefix only for model_type=glm_ocr.
+RUN python3 - <<'PY'
+from pathlib import Path
+
+p = Path("/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/transformers/base.py")
+src = p.read_text(encoding="utf-8")
+orig = src
+
+needle = '                self.ignore_unexpected_suffixes.append(".bias")\n'
+inject = (
+    needle
+    + "\n"
+    + '        if getattr(self.config, "model_type", None) == "glm_ocr":\n'
+    + "            self.ignore_unexpected_prefixes.extend([\n"
+    + '                "model.language_model.layers.16",\n'
+    + '                "model.language_model.layers.16.",\n'
+    + "            ])\n"
+)
+
+if '"model.language_model.layers.16."' in src:
+    print("[patch] vLLM GLM-OCR unexpected-weight ignore patch already applied")
+elif needle in src:
+    src = src.replace(needle, inject, 1)
+    p.write_text(src, encoding="utf-8")
+    print("[patch] Applied vLLM GLM-OCR unexpected-weight ignore patch")
+else:
+    print("[patch] vLLM GLM-OCR patch not needed (pattern missing)")
+PY
+
 RUN python3 -m venv ${VENV_PATH}
 
 COPY requirements.txt /tmp/requirements.txt
