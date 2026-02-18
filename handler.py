@@ -306,14 +306,26 @@ async def _run_glmocr_parse(input_path: Path, output_dir: Path) -> Dict[str, str
 def _find_result_paths(output_dir: Path) -> Dict[str, Optional[Path]]:
     json_candidates = sorted(output_dir.rglob("result.json"))
     if not json_candidates:
-        raise RuntimeError(f"No result.json found under {output_dir}")
+        # GLM-OCR SDK 0.1.1 saves "<doc_stem>.json" instead of "result.json".
+        json_candidates = sorted(output_dir.rglob("*.json"))
+    if not json_candidates:
+        raise RuntimeError(f"No JSON result found under {output_dir}")
 
-    result_json = json_candidates[0]
+    def _rank(path: Path) -> tuple[int, str]:
+        if path.name == "result.json":
+            return (0, str(path))
+        md_peer = path.with_suffix(".md")
+        if md_peer.exists():
+            return (1, str(path))
+        return (2, str(path))
+
+    result_json = sorted(json_candidates, key=_rank)[0]
     doc_dir = result_json.parent
 
-    result_md = doc_dir / "result.md"
+    result_md: Optional[Path] = doc_dir / "result.md"
     if not result_md.exists():
-        result_md = None
+        stem_md = doc_dir / f"{result_json.stem}.md"
+        result_md = stem_md if stem_md.exists() else None
 
     imgs_dir = doc_dir / "imgs"
     if not imgs_dir.exists() or not imgs_dir.is_dir():
