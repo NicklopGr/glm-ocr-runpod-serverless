@@ -103,48 +103,92 @@ if [ -d "${VOLUME_PATH}" ]; then
   echo "[start.sh] Using cache volume: ${VOLUME_PATH}"
 fi
 
-# Generate GLM-OCR SDK config for full layout parsing.
-cat > "${GLMOCR_CONFIG_PATH}" <<YAML
-pipeline:
-  maas:
-    enabled: false
-  ocr_api:
-    api_host: 127.0.0.1
-    api_port: ${VLLM_PORT}
-    model: ${SERVED_MODEL_NAME}
-    api_mode: openai
-    connect_timeout: ${GLMOCR_CONNECT_TIMEOUT}
-    request_timeout: ${GLMOCR_REQUEST_TIMEOUT}
-    retry_max_attempts: ${GLMOCR_RETRY_MAX_ATTEMPTS}
-    retry_backoff_base_seconds: ${GLMOCR_RETRY_BACKOFF_BASE_SECONDS}
-    retry_status_codes: [429, 500, 502, 503, 504]
-    connection_pool_size: ${GLMOCR_CONNECTION_POOL_SIZE}
-    max_workers: ${GLMOCR_MAX_WORKERS}
-    page_maxsize: ${GLMOCR_PAGE_MAXSIZE}
-    region_maxsize: ${GLMOCR_REGION_MAXSIZE}
-  page_loader:
-    max_tokens: ${GLMOCR_MAX_TOKENS_PER_PAGE}
-    temperature: ${GLMOCR_TEMPERATURE}
-    top_p: ${GLMOCR_TOP_P}
-    image_format: JPEG
-    max_pixels: 71372800
-  result_formatter:
-    output_format: ${GLMOCR_OUTPUT_FORMAT}
-  task_prompt_mapping:
-    text: "Text Recognition:"
-    formula: "Formula Recognition:"
-    table: "Table Recognition:"
-  default_prompt: "${GLMOCR_DEFAULT_PROMPT}"
-  enable_layout: ${GLMOCR_ENABLE_LAYOUT}
-  layout:
-    model_dir: ${GLMOCR_LAYOUT_MODEL_DIR}
-    threshold: ${GLMOCR_LAYOUT_THRESHOLD}
-    batch_size: ${GLMOCR_LAYOUT_BATCH_SIZE}
-    workers: ${GLMOCR_LAYOUT_WORKERS}
-    cuda_visible_devices: "${GLMOCR_LAYOUT_CUDA_VISIBLE_DEVICES}"
-YAML
+# Generate GLM-OCR SDK config from the official package template, then apply
+# runtime overrides. This preserves required layout keys (id2label, mappings).
+python3 - <<'PY'
+import os
+from pathlib import Path
 
-echo "[start.sh] Wrote GLM-OCR config: ${GLMOCR_CONFIG_PATH}"
+import yaml
+from glmocr.config import GlmOcrConfig
+
+
+def env(name: str, default: str) -> str:
+    return os.environ.get(name, default)
+
+
+def as_bool(value: str | None, default: bool) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+cfg_path = Path(env("GLMOCR_CONFIG_PATH", "/app/glmocr.config.yaml"))
+template_path = Path(GlmOcrConfig.default_path())
+if not template_path.exists():
+    raise SystemExit(f"[start.sh] GLM-OCR template config not found: {template_path}")
+
+data = yaml.safe_load(template_path.read_text(encoding="utf-8")) or {}
+pipeline = data.setdefault("pipeline", {})
+ocr_api = pipeline.setdefault("ocr_api", {})
+page_loader = pipeline.setdefault("page_loader", {})
+result_formatter = pipeline.setdefault("result_formatter", {})
+layout = pipeline.setdefault("layout", {})
+
+pipeline["enable_layout"] = as_bool(os.environ.get("GLMOCR_ENABLE_LAYOUT"), True)
+pipeline["max_workers"] = int(env("GLMOCR_MAX_WORKERS", "16"))
+pipeline["page_maxsize"] = int(env("GLMOCR_PAGE_MAXSIZE", "100"))
+pipeline["region_maxsize"] = int(env("GLMOCR_REGION_MAXSIZE", "800"))
+
+ocr_api["api_host"] = env("VLLM_HOST", "127.0.0.1")
+ocr_api["api_port"] = int(env("VLLM_PORT", "8080"))
+ocr_api["model"] = env("SERVED_MODEL_NAME", "glm-ocr")
+ocr_api["api_mode"] = "openai"
+ocr_api["connect_timeout"] = int(env("GLMOCR_CONNECT_TIMEOUT", "30"))
+ocr_api["request_timeout"] = int(env("GLMOCR_REQUEST_TIMEOUT", "180"))
+ocr_api["retry_max_attempts"] = int(env("GLMOCR_RETRY_MAX_ATTEMPTS", "3"))
+ocr_api["retry_backoff_base_seconds"] = float(
+    env("GLMOCR_RETRY_BACKOFF_BASE_SECONDS", "0.75")
+)
+ocr_api["connection_pool_size"] = int(env("GLMOCR_CONNECTION_POOL_SIZE", "128"))
+
+page_loader["max_tokens"] = int(env("GLMOCR_MAX_TOKENS_PER_PAGE", "4096"))
+page_loader["temperature"] = float(env("GLMOCR_TEMPERATURE", "0.01"))
+page_loader["top_p"] = float(env("GLMOCR_TOP_P", "0.9"))
+page_loader["image_format"] = "JPEG"
+page_loader["default_prompt"] = env(
+    "GLMOCR_DEFAULT_PROMPT", page_loader.get("default_prompt", "")
+)
+
+result_formatter["output_format"] = env("GLMOCR_OUTPUT_FORMAT", "both")
+
+layout["model_dir"] = env(
+    "GLMOCR_LAYOUT_MODEL_DIR", "PaddlePaddle/PP-DocLayoutV3_safetensors"
+)
+layout["threshold"] = float(env("GLMOCR_LAYOUT_THRESHOLD", "0.3"))
+layout["batch_size"] = int(env("GLMOCR_LAYOUT_BATCH_SIZE", "1"))
+layout["workers"] = int(env("GLMOCR_LAYOUT_WORKERS", "1"))
+layout["cuda_visible_devices"] = env("GLMOCR_LAYOUT_CUDA_VISIBLE_DEVICES", "0")
+
+if pipeline["enable_layout"]:
+    missing = [key for key in ("id2label", "label_task_mapping") if not layout.get(key)]
+    if missing:
+        joined = ", ".join(f"pipeline.layout.{key}" for key in missing)
+        raise SystemExit(
+            "[start.sh] invalid GLM-OCR layout config: missing required fields: "
+            + joined
+        )
+
+cfg_path.parent.mkdir(parents=True, exist_ok=True)
+cfg_path.write_text(
+    yaml.safe_dump(data, sort_keys=False, allow_unicode=True),
+    encoding="utf-8",
+)
+print(f"[start.sh] Loaded GLM-OCR template: {template_path}")
+print(f"[start.sh] Wrote GLM-OCR config: {cfg_path}")
+if pipeline["enable_layout"]:
+    print(f"[start.sh] Layout classes: {len(layout.get('id2label', {}))}")
+PY
 
 VLLM_PID=""
 cleanup() {

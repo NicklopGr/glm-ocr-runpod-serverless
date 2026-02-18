@@ -293,7 +293,8 @@ async def _run_glmocr_parse(input_path: Path, output_dir: Path) -> Dict[str, str
     if proc.returncode != 0:
         raise RuntimeError(
             f"glmocr parse failed (code={proc.returncode}). "
-            f"stderr_tail={stderr[-1500:]} stdout_tail={stdout[-1500:]}"
+            f"stderr_head={stderr[:800]} stderr_tail={stderr[-1500:]} "
+            f"stdout_tail={stdout[-1500:]}"
         )
 
     return {
@@ -358,12 +359,16 @@ def _collect_image_artifacts(
 def _find_layout_visualizations(doc_dir: Path) -> List[Path]:
     valid_ext = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
     out: List[Path] = []
-    for path in sorted(doc_dir.iterdir()):
-        if not path.is_file() or path.suffix.lower() not in valid_ext:
+    search_dirs: List[Path] = [doc_dir, doc_dir / "layout_vis"]
+    for base in search_dirs:
+        if not base.exists() or not base.is_dir():
             continue
-        name = path.name.lower()
-        if "layout" in name or "visual" in name:
-            out.append(path)
+        for path in sorted(base.iterdir()):
+            if not path.is_file() or path.suffix.lower() not in valid_ext:
+                continue
+            name = path.name.lower()
+            if "layout" in name or "visual" in name or base.name.lower() == "layout_vis":
+                out.append(path)
     return out
 
 

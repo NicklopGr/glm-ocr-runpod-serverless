@@ -69,15 +69,28 @@ import importlib.metadata as md
 from pathlib import Path
 
 import vllm
+import yaml
 from packaging.markers import default_environment
 from packaging.requirements import InvalidRequirement
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import Version
+from glmocr.config import GlmOcrConfig
 from transformers.models.auto.configuration_auto import CONFIG_MAPPING_NAMES
 
 for pkg in ["vllm", "transformers", "tokenizers", "huggingface_hub", "tqdm", "glmocr"]:
     print(f"[runtime] {pkg}=={md.version(pkg)}")
+
+glmocr_template = Path(GlmOcrConfig.default_path())
+if not glmocr_template.exists():
+    raise SystemExit(f"[compat] glmocr template config missing: {glmocr_template}")
+glmocr_cfg = yaml.safe_load(glmocr_template.read_text(encoding="utf-8")) or {}
+layout_cfg = ((glmocr_cfg.get("pipeline") or {}).get("layout")) or {}
+for required in ("id2label", "label_task_mapping"):
+    if not layout_cfg.get(required):
+        raise SystemExit(
+            f"[compat] glmocr template config missing pipeline.layout.{required}"
+        )
 
 if Version(md.version("transformers")) < Version("5.1.0"):
     raise SystemExit("[compat] transformers must be >=5.1.0 for glm_ocr support")
