@@ -10,7 +10,6 @@ set -euo pipefail
 : "${VLLM_HOST:=0.0.0.0}"
 : "${VLLM_PORT:=8080}"
 : "${VLLM_DTYPE:=float16}"
-: "${TRUST_REMOTE_CODE:=true}"
 : "${GPU_MEMORY_UTILIZATION:=0.92}"
 : "${MAX_MODEL_LEN:=16384}"
 : "${MAX_NUM_SEQS:=96}"
@@ -55,7 +54,7 @@ set -euo pipefail
 : "${GLMOCR_LAYOUT_WORKERS:=1}"
 : "${GLMOCR_LAYOUT_CUDA_VISIBLE_DEVICES:=0}"
 
-export MODEL_NAME MODEL_REVISION SERVED_MODEL_NAME VLLM_HOST VLLM_PORT VLLM_DTYPE TRUST_REMOTE_CODE
+export MODEL_NAME MODEL_REVISION SERVED_MODEL_NAME VLLM_HOST VLLM_PORT VLLM_DTYPE
 export GPU_MEMORY_UTILIZATION MAX_MODEL_LEN MAX_NUM_SEQS MAX_NUM_BATCHED_TOKENS
 export LIMIT_MM_PER_PROMPT SPECULATIVE_CONFIG VLLM_HEALTH_TIMEOUT
 
@@ -101,6 +100,15 @@ if [ -d "${VOLUME_PATH}" ]; then
   export XDG_CACHE_HOME="${VOLUME_PATH}/xdg-cache"
   mkdir -p "${HF_HOME}" "${HUGGINGFACE_HUB_CACHE}" "${XDG_CACHE_HOME}/vllm"
   echo "[start.sh] Using cache volume: ${VOLUME_PATH}"
+fi
+
+if [ -n "${HF_TOKEN:-}" ]; then
+  export HUGGING_FACE_HUB_TOKEN="${HF_TOKEN}"
+  echo "[start.sh] HF auth: enabled via HF_TOKEN"
+elif [ -n "${HUGGING_FACE_HUB_TOKEN:-}" ]; then
+  echo "[start.sh] HF auth: enabled via HUGGING_FACE_HUB_TOKEN"
+else
+  echo "[start.sh] WARNING: HF auth is not configured; downloads may be rate-limited"
 fi
 
 # Generate GLM-OCR SDK config from the official package template, then apply
@@ -231,11 +239,16 @@ if [ -n "${SPECULATIVE_CONFIG}" ]; then
   vllm_args+=(--speculative-config "${SPECULATIVE_CONFIG}")
 fi
 
-if [ "${TRUST_REMOTE_CODE,,}" = "true" ]; then
-  vllm_args+=(--trust-remote-code)
-fi
+vllm_env=(
+  env
+  -u VLLM_BASE_IMAGE_REF
+  -u VLLM_DTYPE
+  -u VLLM_HEALTH_TIMEOUT
+  -u VLLM_HOST
+  -u VLLM_PORT
+)
 
-vllm "${vllm_args[@]}" &
+"${vllm_env[@]}" vllm "${vllm_args[@]}" &
 VLLM_PID=$!
 
 HEALTH_URL="http://127.0.0.1:${VLLM_PORT}/health"

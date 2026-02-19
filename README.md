@@ -17,8 +17,8 @@ RunPod `RTX A40` is usually **48GB VRAM** (not 40GB).
 - `Dockerfile`: installs runtime + official GLM-OCR SDK
 - `start.sh`: starts vLLM, loads official `glmocr/config.yaml` template, applies runtime overrides, starts handler
 - `handler.py`: accepts PDF/images, runs full layout parse, returns JSON/Markdown + optional image artifacts
-- `.env.a40`: A40 preset (single worker)
-- `.env.h100`: H100 preset (single worker, higher concurrency)
+- `.env.a40`: A40 preset (balanced concurrency baseline)
+- `.env.h100`: H100 preset (higher concurrency baseline)
 
 ## Build
 ```bash
@@ -103,6 +103,9 @@ Recommended:
 Environment presets:
 - A40: paste from `.env.a40`
 - H100: paste from `.env.h100`
+
+Auth recommendation:
+- set `HF_TOKEN` in endpoint env (prevents anonymous HF Hub throttling during downloads)
 
 ## GitHub Workflow (Build First On GitHub)
 This repo now includes:
@@ -195,6 +198,10 @@ Stability note:
 1. Increase `GLMOCR_MAX_WORKERS` and `GLMOCR_CONNECTION_POOL_SIZE`.
 2. Increase `MAX_NUM_SEQS` / `MAX_NUM_BATCHED_TOKENS` if GPU headroom exists.
 3. Increase `WORKER_MAX_CONCURRENCY` only after step 1-2 are stable.
+
+Current preset baselines in this repo:
+- A40: `WORKER_MAX_CONCURRENCY=2`
+- H100: `WORKER_MAX_CONCURRENCY=3`
 
 If unstable/OOM:
 - reduce `WORKER_MAX_CONCURRENCY`
