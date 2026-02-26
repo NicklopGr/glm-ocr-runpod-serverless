@@ -23,6 +23,11 @@ ENV VLLM_BASE_IMAGE_REF=${VLLM_BASE_IMAGE}
 
 COPY requirements.txt /tmp/requirements.txt
 
+# Needed for pip installs from git+https URLs (transformers from source).
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git && \
+    rm -rf /var/lib/apt/lists/*
+
 # Verify the pinned vLLM base actually contains native GLM-OCR support.
 RUN python3 - <<'PY'
 from pathlib import Path
