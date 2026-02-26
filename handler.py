@@ -154,6 +154,32 @@ async def _download_urls(urls: List[str]) -> List[bytes]:
         return await asyncio.gather(*[_fetch(url) for url in urls])
 
 
+def _decode_image_batch_payload(raw_batch: bytes) -> List[bytes]:
+    try:
+        payload = json.loads(raw_batch.decode("utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        raise InputError(f"Invalid image batch payload (must be JSON): {exc}") from exc
+
+    images_field: Any = None
+    if isinstance(payload, dict):
+        images_field = payload.get("images_base64")
+        if images_field is None:
+            images_field = payload.get("images")
+    elif isinstance(payload, list):
+        images_field = payload
+
+    if not isinstance(images_field, list) or not images_field:
+        raise InputError("Invalid image batch payload: expected non-empty list in `images_base64`")
+
+    out: List[bytes] = []
+    for idx, item in enumerate(images_field):
+        if not isinstance(item, str):
+            raise InputError(f"Invalid image batch payload: item {idx} is not a base64 string")
+        out.append(_b64decode(item))
+
+    return out
+
+
 async def _collect_document(job_input: Dict[str, Any]) -> Tuple[Path, int, Dict[str, Any], Path]:
     start_page = max(1, int(job_input.get("start_page", 1)))
     end_page_raw = job_input.get("end_page")
@@ -171,6 +197,8 @@ async def _collect_document(job_input: Dict[str, Any]) -> Tuple[Path, int, Dict[
     image_base64 = job_input.get("image_base64")
     image_urls = list(job_input.get("image_urls") or ([] if image_url is None else [image_url]))
     images_base64 = list(job_input.get("images_base64") or ([] if image_base64 is None else [image_base64]))
+    image_batch_url = job_input.get("image_batch_url")
+    image_batch_base64 = job_input.get("image_batch_base64")
     source_url = job_input.get("source_url")
     source_base64 = job_input.get("source_base64")
 
@@ -187,6 +215,18 @@ async def _collect_document(job_input: Dict[str, Any]) -> Tuple[Path, int, Dict[
         else:
             pdf_bytes = _b64decode(pdf_base64)
             input_meta["input_type"] = "pdf_base64"
+    elif image_batch_url or image_batch_base64:
+        if image_batch_url and image_batch_base64:
+            raise InputError("Provide only one of image_batch_url or image_batch_base64")
+        if image_batch_url:
+            raw_batch = (await _download_urls([image_batch_url]))[0]
+            input_meta["input_type"] = "image_batch_url"
+            input_meta["source"] = image_batch_url
+        else:
+            raw_batch = _b64decode(image_batch_base64)
+            input_meta["input_type"] = "image_batch_base64"
+        image_bytes_list = _decode_image_batch_payload(raw_batch)
+        input_meta["source_count"] = len(image_bytes_list)
     elif image_urls or images_base64:
         if image_urls and images_base64:
             raise InputError("Use either image_urls or images_base64 in one request")
@@ -222,7 +262,8 @@ async def _collect_document(job_input: Dict[str, Any]) -> Tuple[Path, int, Dict[
                 input_meta["resolved_type"] = "image"
     else:
         raise InputError(
-            "No input provided. Use one of: pdf_url/pdf_base64, image_urls/images_base64, source_url/source_base64"
+            "No input provided. Use one of: pdf_url/pdf_base64, image_batch_url/image_batch_base64, "
+            "image_urls/images_base64, source_url/source_base64"
         )
 
     if pdf_bytes is not None:
