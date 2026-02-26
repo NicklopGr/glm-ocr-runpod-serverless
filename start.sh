@@ -38,7 +38,7 @@ GLMOCR_CONNECTION_POOL_SIZE="128"
 GLMOCR_PAGE_MAXSIZE="100"
 GLMOCR_REGION_MAXSIZE="800"
 GLMOCR_MAX_TOKENS_PER_PAGE="4096"
-GLMOCR_TEMPERATURE="0.01"
+GLMOCR_TEMPERATURE="0.8"
 GLMOCR_TOP_P="0.9"
 GLMOCR_DEFAULT_PROMPT="Recognize all text, formulas, and tables in the document."
 
@@ -164,7 +164,7 @@ ocr_api["retry_backoff_base_seconds"] = float(
 ocr_api["connection_pool_size"] = int(env("GLMOCR_CONNECTION_POOL_SIZE", "128"))
 
 page_loader["max_tokens"] = int(env("GLMOCR_MAX_TOKENS_PER_PAGE", "4096"))
-page_loader["temperature"] = float(env("GLMOCR_TEMPERATURE", "0.01"))
+page_loader["temperature"] = float(env("GLMOCR_TEMPERATURE", "0.8"))
 page_loader["top_p"] = float(env("GLMOCR_TOP_P", "0.9"))
 page_loader["image_format"] = "JPEG"
 page_loader["default_prompt"] = env(
