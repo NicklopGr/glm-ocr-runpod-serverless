@@ -10,13 +10,14 @@ MODEL_REVISION="e9134f400acad80346162536e043def285fa1022"
 SERVED_MODEL_NAME="glm-ocr"
 VLLM_HOST="0.0.0.0"
 VLLM_PORT="8080"
-VLLM_DTYPE="float16"
+VLLM_DTYPE="bfloat16"
 GPU_MEMORY_UTILIZATION="0.92"
 MAX_MODEL_LEN="16384"
 MAX_NUM_SEQS="96"
 MAX_NUM_BATCHED_TOKENS="32768"
 LIMIT_MM_PER_PROMPT="${LIMIT_MM_PER_PROMPT:-}"
-SPECULATIVE_CONFIG="${SPECULATIVE_CONFIG:-}"
+DEFAULT_SPECULATIVE_CONFIG='{"method":"mtp","num_speculative_tokens":1}'
+SPECULATIVE_CONFIG="${SPECULATIVE_CONFIG:-$DEFAULT_SPECULATIVE_CONFIG}"
 VLLM_HEALTH_TIMEOUT="420"
 
 WORKER_MAX_CONCURRENCY="1"
@@ -47,6 +48,9 @@ GLMOCR_RETRY_MAX_ATTEMPTS="3"
 GLMOCR_RETRY_BACKOFF_BASE_SECONDS="0.75"
 
 GLMOCR_LAYOUT_MODEL_DIR="PaddlePaddle/PP-DocLayoutV3_safetensors"
+GLMOCR_LAYOUT_ENSURE_LATEST="${GLMOCR_LAYOUT_ENSURE_LATEST:-true}"
+GLMOCR_LAYOUT_REVISION="${GLMOCR_LAYOUT_REVISION:-main}"
+GLMOCR_LAYOUT_CACHE_DIR="${GLMOCR_LAYOUT_CACHE_DIR:-/tmp/glmocr-layout-models}"
 GLMOCR_LAYOUT_THRESHOLD="0.3"
 GLMOCR_LAYOUT_BATCH_SIZE="1"
 GLMOCR_LAYOUT_WORKERS="1"
@@ -64,6 +68,7 @@ export GLMOCR_CONNECTION_POOL_SIZE GLMOCR_PAGE_MAXSIZE GLMOCR_REGION_MAXSIZE
 export GLMOCR_MAX_TOKENS_PER_PAGE GLMOCR_TEMPERATURE GLMOCR_TOP_P GLMOCR_DEFAULT_PROMPT
 export GLMOCR_CONNECT_TIMEOUT GLMOCR_REQUEST_TIMEOUT GLMOCR_RETRY_MAX_ATTEMPTS GLMOCR_RETRY_BACKOFF_BASE_SECONDS
 export GLMOCR_LAYOUT_MODEL_DIR GLMOCR_LAYOUT_THRESHOLD GLMOCR_LAYOUT_BATCH_SIZE GLMOCR_LAYOUT_WORKERS GLMOCR_LAYOUT_CUDA_VISIBLE_DEVICES
+export GLMOCR_LAYOUT_ENSURE_LATEST GLMOCR_LAYOUT_REVISION GLMOCR_LAYOUT_CACHE_DIR
 
 echo "[start.sh] Model: ${MODEL_NAME} -> ${SERVED_MODEL_NAME}"
 if [ -n "${MODEL_REVISION}" ]; then
@@ -168,9 +173,50 @@ page_loader["default_prompt"] = env(
 
 result_formatter["output_format"] = env("GLMOCR_OUTPUT_FORMAT", "both")
 
-layout["model_dir"] = env(
+layout_model_dir = env(
     "GLMOCR_LAYOUT_MODEL_DIR", "PaddlePaddle/PP-DocLayoutV3_safetensors"
 )
+layout_ensure_latest = as_bool(os.environ.get("GLMOCR_LAYOUT_ENSURE_LATEST"), True)
+layout_revision = env("GLMOCR_LAYOUT_REVISION", "main")
+layout_cache_dir = env("GLMOCR_LAYOUT_CACHE_DIR", "/tmp/glmocr-layout-models")
+if layout_ensure_latest:
+    try:
+        from huggingface_hub import HfApi
+        from huggingface_hub import snapshot_download
+
+        is_hf_repo = (
+            "/" in layout_model_dir
+            and not layout_model_dir.startswith(("file://", "http://", "https://"))
+            and not Path(layout_model_dir).exists()
+        )
+        if is_hf_repo:
+            info = HfApi().model_info(layout_model_dir, revision=layout_revision)
+            latest_sha = info.sha
+            target_dir = (
+                Path(layout_cache_dir).expanduser().resolve()
+                / layout_model_dir.replace("/", "--")
+                / latest_sha
+            )
+            target_dir.mkdir(parents=True, exist_ok=True)
+            token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+            resolved_dir = snapshot_download(
+                repo_id=layout_model_dir,
+                revision=latest_sha,
+                local_dir=str(target_dir),
+                token=token,
+            )
+            layout_model_dir = str(resolved_dir)
+            print(
+                f"[start.sh] Resolved latest layout model: "
+                f"{env('GLMOCR_LAYOUT_MODEL_DIR', '')}@{latest_sha}"
+            )
+    except Exception as exc:
+        print(
+            "[start.sh] WARNING: could not resolve latest layout model; "
+            f"using configured value. reason={exc}"
+        )
+
+layout["model_dir"] = layout_model_dir
 layout["threshold"] = float(env("GLMOCR_LAYOUT_THRESHOLD", "0.3"))
 layout["batch_size"] = int(env("GLMOCR_LAYOUT_BATCH_SIZE", "1"))
 layout["workers"] = int(env("GLMOCR_LAYOUT_WORKERS", "1"))
