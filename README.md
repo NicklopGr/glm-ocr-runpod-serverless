@@ -142,8 +142,6 @@ Example:
 {
   "input": {
     "pdf_url": "https://.../statement.pdf",
-    "start_page": 1,
-    "end_page": 12,
     "return_crop_images": true,
     "crop_images_base64": false,
     "max_crop_images": 50,

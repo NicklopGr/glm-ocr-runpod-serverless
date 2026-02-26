@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import aiohttp
 import runpod
 from PIL import Image
-from pypdf import PdfReader, PdfWriter
+from pypdf import PdfReader
 
 
 def _env_int(name: str, default: int) -> int:
@@ -96,25 +96,12 @@ def _detect_image_extension(image_bytes: bytes) -> str:
     }.get(fmt, ".img")
 
 
-def _slice_pdf_bytes(pdf_bytes: bytes, start_page: int, end_page: Optional[int]) -> Tuple[bytes, int, int]:
-    reader = PdfReader(io.BytesIO(pdf_bytes))
-    total_pages = len(reader.pages)
-
-    start_idx = max(0, start_page - 1)
-    end_idx = total_pages if end_page is None else min(total_pages, end_page)
-
-    if start_idx >= end_idx:
-        raise InputError(
-            f"Invalid page range: start_page={start_page}, end_page={end_page}, total_pages={total_pages}"
-        )
-
-    writer = PdfWriter()
-    for idx in range(start_idx, end_idx):
-        writer.add_page(reader.pages[idx])
-
-    out = io.BytesIO()
-    writer.write(out)
-    return out.getvalue(), total_pages, (end_idx - start_idx)
+def _count_pdf_pages(pdf_bytes: bytes) -> int:
+    try:
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+    except Exception as exc:  # noqa: BLE001
+        raise InputError(f"Failed to read PDF: {exc}") from exc
+    return len(reader.pages)
 
 
 def _write_images_as_pdf(image_bytes_list: List[bytes], pdf_path: Path) -> int:
@@ -155,15 +142,13 @@ async def _download_urls(urls: List[str]) -> List[bytes]:
 
 
 async def _collect_document(job_input: Dict[str, Any]) -> Tuple[Path, int, Dict[str, Any], Path]:
-    start_page = max(1, int(job_input.get("start_page", 1)))
-    end_page_raw = job_input.get("end_page")
-    end_page = int(end_page_raw) if end_page_raw is not None else None
-
     temp_dir = Path(tempfile.mkdtemp(prefix="glmocr_job_", dir="/tmp"))
-    input_meta: Dict[str, Any] = {
-        "start_page": start_page,
-        "end_page": end_page,
-    }
+    input_meta: Dict[str, Any] = {}
+
+    if "start_page" in job_input or "end_page" in job_input:
+        raise InputError(
+            "start_page/end_page are not supported in this worker. Submit one full PDF per job."
+        )
 
     pdf_url = job_input.get("pdf_url")
     pdf_base64 = job_input.get("pdf_base64")
@@ -229,19 +214,19 @@ async def _collect_document(job_input: Dict[str, Any]) -> Tuple[Path, int, Dict[
         if not _is_pdf_bytes(pdf_bytes):
             raise InputError("Input was treated as PDF but payload is not a valid PDF header")
 
-        sliced_pdf_bytes, total_pages, selected_pages = _slice_pdf_bytes(pdf_bytes, start_page=start_page, end_page=end_page)
-        if selected_pages > MAX_PAGES_PER_JOB:
+        total_pages = _count_pdf_pages(pdf_bytes)
+        if total_pages > MAX_PAGES_PER_JOB:
             raise InputError(
-                f"This job has {selected_pages} pages but MAX_PAGES_PER_JOB={MAX_PAGES_PER_JOB}. "
+                f"This job has {total_pages} pages but MAX_PAGES_PER_JOB={MAX_PAGES_PER_JOB}. "
                 "Split into smaller requests or increase MAX_PAGES_PER_JOB."
             )
 
         input_path = temp_dir / "input.pdf"
-        input_path.write_bytes(sliced_pdf_bytes)
+        input_path.write_bytes(pdf_bytes)
 
         input_meta["total_pdf_pages"] = total_pages
-        input_meta["selected_pages"] = selected_pages
-        return input_path, selected_pages, input_meta, temp_dir
+        input_meta["selected_pages"] = total_pages
+        return input_path, total_pages, input_meta, temp_dir
 
     # Image path flow (no resize/recompression for single-image inputs).
     page_count = len(image_bytes_list)
