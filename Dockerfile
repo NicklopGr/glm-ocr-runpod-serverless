@@ -15,16 +15,10 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 ARG GLMOCR_REF=529a0c7ee9aecf55095e6fa6d9da08e4bb3bc2a9
-ARG TRANSFORMERS_VERSION=5.2.0
-ARG TOKENIZERS_VERSION=0.22.2
-ARG HUGGINGFACE_HUB_VERSION=1.4.1
-ARG TQDM_VERSION=4.67.1
+ARG TRANSFORMERS_REF=git+https://github.com/huggingface/transformers.git
 
 ENV GLMOCR_REF=${GLMOCR_REF}
-ENV TRANSFORMERS_VERSION=${TRANSFORMERS_VERSION}
-ENV TOKENIZERS_VERSION=${TOKENIZERS_VERSION}
-ENV HUGGINGFACE_HUB_VERSION=${HUGGINGFACE_HUB_VERSION}
-ENV TQDM_VERSION=${TQDM_VERSION}
+ENV TRANSFORMERS_REF=${TRANSFORMERS_REF}
 ENV VLLM_BASE_IMAGE_REF=${VLLM_BASE_IMAGE}
 
 COPY requirements.txt /tmp/requirements.txt
@@ -54,11 +48,7 @@ PY
 # vLLM is launched via /usr/local/bin/vllm (global interpreter), so splitting
 # deps across a venv and global Python causes model-config mismatch at startup.
 RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install --upgrade \
-      "transformers==${TRANSFORMERS_VERSION}" \
-      "tokenizers==${TOKENIZERS_VERSION}" \
-      "huggingface_hub==${HUGGINGFACE_HUB_VERSION}" \
-      "tqdm==${TQDM_VERSION}" && \
+    python3 -m pip install --upgrade "${TRANSFORMERS_REF}" && \
     python3 -m pip install --upgrade --ignore-installed "blinker==1.9.0" && \
     python3 -m pip install -r /tmp/requirements.txt && \
     python3 -m pip install "https://github.com/zai-org/GLM-OCR/archive/${GLMOCR_REF}.zip"

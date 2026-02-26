@@ -31,11 +31,9 @@ Pinned refs and compatibility:
 - Source commit: https://github.com/zai-org/GLM-OCR/commit/529a0c7ee9aecf55095e6fa6d9da08e4bb3bc2a9
 - vLLM base image pinned by commit + digest:
   - `VLLM_BASE_IMAGE=vllm/vllm-openai:nightly-d00df624f313a6a5a7a6245b71448b068b080cd7@sha256:3f5ad92f63e3f4b0073cca935a976d4cbf2a21e22cf06a95fd6df47759e10e04`
-- Runtime pins used globally (single shared Python env for vLLM + handler):
-  - `TRANSFORMERS_VERSION=5.2.0`
-  - `TOKENIZERS_VERSION=0.22.2`
-  - `HUGGINGFACE_HUB_VERSION=1.4.1`
-  - `TQDM_VERSION=4.67.1`
+- Runtime install used globally (single shared Python env for vLLM + handler):
+  - `TRANSFORMERS_REF=git+https://github.com/huggingface/transformers.git`
+  - `requirements.txt` keeps minimum versions for `huggingface_hub` and `tqdm`
 - Why this matters:
   - GLM-OCR model type (`glm_ocr`) is present in Transformers `>=5.1.0`
   - if vLLM and handler use different Python environments, startup can fail with:
@@ -59,19 +57,17 @@ Pinned refs and compatibility:
     on the same known allowlisted metadata mismatch and unrelated system deps
 - GLM-OCR model snapshot pin:
   - default in `start.sh` (used when endpoint env is missing)
-  - `MODEL_REVISION=e9134f400acad80346162536e043def285fa1022`
+  - `MODEL_REVISION=677c6baa60442a451f8a8c7eabdfab32d9801a0b`
   - same value in `.env.a40` and `.env.h100` presets
-  - Source commit: https://huggingface.co/zai-org/GLM-OCR/commit/e9134f400acad80346162536e043def285fa1022
+  - Source commit: https://huggingface.co/zai-org/GLM-OCR/commit/677c6baa60442a451f8a8c7eabdfab32d9801a0b
+  - image processor parity: `MM_PROCESSOR_KWARGS={"use_fast": false}` (default in `start.sh`)
 
 To compare builds across versions, override explicitly:
 ```bash
 docker build \
   --build-arg VLLM_BASE_IMAGE=<image-tag-or-digest> \
   --build-arg GLMOCR_REF=<commit-sha> \
-  --build-arg TRANSFORMERS_VERSION=<transformers-version> \
-  --build-arg TOKENIZERS_VERSION=<tokenizers-version> \
-  --build-arg HUGGINGFACE_HUB_VERSION=<huggingface_hub-version> \
-  --build-arg TQDM_VERSION=<tqdm-version> \
+  --build-arg TRANSFORMERS_REF=git+https://github.com/huggingface/transformers.git \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
@@ -80,10 +76,7 @@ For strict immutability, prefer a digest:
 docker build \
   --build-arg VLLM_BASE_IMAGE=vllm/vllm-openai:<tag>@sha256:<digest> \
   --build-arg GLMOCR_REF=<commit-sha> \
-  --build-arg TRANSFORMERS_VERSION=<transformers-version> \
-  --build-arg TOKENIZERS_VERSION=<tokenizers-version> \
-  --build-arg HUGGINGFACE_HUB_VERSION=<huggingface_hub-version> \
-  --build-arg TQDM_VERSION=<tqdm-version> \
+  --build-arg TRANSFORMERS_REF=git+https://github.com/huggingface/transformers.git \
   -t <dockerhub_user>/glm-ocr-runpod:<tag> .
 ```
 
@@ -200,8 +193,8 @@ Stability note:
 3. Increase `WORKER_MAX_CONCURRENCY` only after step 1-2 are stable.
 
 Current preset baselines in this repo:
-- A40: `WORKER_MAX_CONCURRENCY=2`
-- H100: `WORKER_MAX_CONCURRENCY=3`
+- A40: `WORKER_MAX_CONCURRENCY=1`
+- H100: `WORKER_MAX_CONCURRENCY=1`
 
 If unstable/OOM:
 - reduce `WORKER_MAX_CONCURRENCY`

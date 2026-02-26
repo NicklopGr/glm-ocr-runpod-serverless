@@ -40,8 +40,6 @@ def _to_bool(val: Any, default: bool = False) -> bool:
 WORKER_MAX_CONCURRENCY = max(1, _env_int("WORKER_MAX_CONCURRENCY", 1))
 DOWNLOAD_CONCURRENCY = max(1, _env_int("DOWNLOAD_CONCURRENCY", 16))
 MAX_PAGES_PER_JOB = max(1, _env_int("MAX_PAGES_PER_JOB", 128))
-IMAGE_MAX_SIDE = max(512, _env_int("IMAGE_MAX_SIDE", 2200))
-IMAGE_JPEG_QUALITY = max(40, min(95, _env_int("IMAGE_JPEG_QUALITY", 90)))
 
 GLMOCR_CONFIG_PATH = os.environ.get("GLMOCR_CONFIG_PATH", "/app/glmocr.config.yaml")
 GLMOCR_PARSE_TIMEOUT_SECONDS = max(60, _env_int("GLMOCR_PARSE_TIMEOUT_SECONDS", 1800))
@@ -79,14 +77,23 @@ def _url_looks_pdf(url: str) -> bool:
     return ".pdf" in url.lower().split("?", 1)[0]
 
 
-def _image_bytes_to_jpeg(image_bytes: bytes) -> bytes:
-    with Image.open(io.BytesIO(image_bytes)) as image:
-        if image.mode != "RGB":
-            image = image.convert("RGB")
-        image.thumbnail((IMAGE_MAX_SIDE, IMAGE_MAX_SIDE), Image.Resampling.LANCZOS)
-        out = io.BytesIO()
-        image.save(out, format="JPEG", quality=IMAGE_JPEG_QUALITY, optimize=True)
-        return out.getvalue()
+def _detect_image_extension(image_bytes: bytes) -> str:
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as image:
+            fmt = (image.format or "").upper()
+    except Exception as exc:  # noqa: BLE001
+        raise InputError(f"Unsupported image payload: {exc}") from exc
+
+    return {
+        "JPEG": ".jpg",
+        "JPG": ".jpg",
+        "PNG": ".png",
+        "WEBP": ".webp",
+        "BMP": ".bmp",
+        "TIFF": ".tiff",
+        "TIF": ".tiff",
+        "GIF": ".gif",
+    }.get(fmt, ".img")
 
 
 def _slice_pdf_bytes(pdf_bytes: bytes, start_page: int, end_page: Optional[int]) -> Tuple[bytes, int, int]:
@@ -236,9 +243,8 @@ async def _collect_document(job_input: Dict[str, Any]) -> Tuple[Path, int, Dict[
         input_meta["selected_pages"] = selected_pages
         return input_path, selected_pages, input_meta, temp_dir
 
-    # Image path flow.
-    normalized = [_image_bytes_to_jpeg(raw) for raw in image_bytes_list]
-    page_count = len(normalized)
+    # Image path flow (no resize/recompression for single-image inputs).
+    page_count = len(image_bytes_list)
     if page_count == 0:
         raise InputError("No image pages resolved from input")
 
@@ -249,11 +255,13 @@ async def _collect_document(job_input: Dict[str, Any]) -> Tuple[Path, int, Dict[
         )
 
     if page_count == 1:
-        input_path = temp_dir / "input.jpg"
-        input_path.write_bytes(normalized[0])
+        image_bytes = image_bytes_list[0]
+        input_path = temp_dir / f"input{_detect_image_extension(image_bytes)}"
+        input_path.write_bytes(image_bytes)
     else:
+        # Keep multipage semantics by wrapping into a PDF container for glmocr parse.
         input_path = temp_dir / "input.pdf"
-        _write_images_as_pdf(normalized, input_path)
+        _write_images_as_pdf(image_bytes_list, input_path)
 
     input_meta["selected_pages"] = page_count
     return input_path, page_count, input_meta, temp_dir
